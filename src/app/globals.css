@@ -2,14 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Força o tema escuro em produção */
-:root {
-  --background: #020617;
-  --foreground: #ffffff;
-}
-
 body {
   background-color: #020617 !important;
   color: #ffffff !important;
   min-height: 100vh;
+}
+
+/* Força o tema escuro em produção */
+:root {
+  --background: #020617;
+  --foreground: #ffffff;
+
 }
