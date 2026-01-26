@@ -210,7 +210,7 @@ const handleSaveAll = async () => {
               <div key={index} className="flex gap-2 animate-in slide-in-from-left-2 items-center">
                 <input 
                   placeholder="PLATAFORMA" 
-                  className="w-1/3 bg-slate-50 border rounded-xl px-3 py-2 text-[11px] font-bold uppercase outline-none focus:ring-1 focus:ring-blue-500/20"
+                  className="w-1/3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-bold uppercase text-slate-900 placeholder:text-slate-400 outline-none focus:ring-1 focus:ring-blue-500/20"
                   value={key.name}
                   onChange={(e) => updateKey(index, 'name', e.target.value)}
                 />
@@ -218,8 +218,7 @@ const handleSaveAll = async () => {
                   <input 
                     type={visibleKeys[index] ? "text" : "password"} 
                     placeholder="API Key / Token" 
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 pr-8 text-[11px] font-medium outline-none focus:ring-1 focus:ring-blue-500/20"
-                    value={key.value}
+                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 pr-8 text-[11px] font-medium text-slate-900 outline-none focus:ring-1 focus:ring-blue-500/20"
                     onChange={(e) => updateKey(index, 'value', e.target.value)}
                   />
                   <button type="button" onClick={() => toggleVisibility(index)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors">
