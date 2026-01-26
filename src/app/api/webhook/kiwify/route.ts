@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import TelegramBot from 'node-telegram-bot-api';
 
+
 export const dynamic = 'force-dynamic';
 
 // 1. Definição ÚNICA e SEGURA do cliente Supabase
