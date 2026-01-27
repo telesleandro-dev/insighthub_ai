@@ -34,18 +34,31 @@ export async function POST(req: Request) {
     }
 
     // 3. BUSCA CONFIGURAÇÃO PELO ID DO USUÁRIO (Escalável)
-    // 3. BUSCA CONFIGURAÇÃO PELO ID DO USUÁRIO
+   
+// 3. BUSCA CONFIGURAÇÃO PELO ID DO USUÁRIO
+console.log("Tentando buscar ID no banco:", userIdFromUrl);
+
 const { data: userConfig, error: configError } = await supabase
   .from('user_configs')
-  .select('user_id, telegram_token, telegram_chat_id')
-  .eq('user_id', userIdFromUrl)
-  .maybeSingle(); // Usamos maybeSingle para não estourar erro se não achar
+  .select('*') // Vamos pegar tudo para testar
+  .eq('user_id', userIdFromUrl.trim()) // O .trim() remove espaços invisíveis
+  .maybeSingle();
 
-if (configError || !userConfig) {
-  // LOG PARA VOCÊ VER NO PAINEL DA VERCEL O QUE DEU ERRADO
-  console.error("DEBUG WEBHOOK - Erro:", configError);
-  console.error("DEBUG WEBHOOK - ID Buscado:", userIdFromUrl);
-  return NextResponse.json({ error: 'Usuario nao configurado no banco' }, { status: 401 });
+if (configError) {
+  console.error("ERRO CRÍTICO DO SUPABASE:", configError.message);
+}
+
+if (!userConfig) {
+  console.log("AVISO: O Supabase não encontrou nenhuma linha para este ID.");
+  // Vamos listar as IDs que existem no banco só para comparar no log
+  const { data: allConfigs } = await supabase.from('user_configs').select('user_id').limit(5);
+  console.log("IDs que existem no banco no momento:", allConfigs);
+  
+  return NextResponse.json({ 
+    error: 'Usuario nao encontrado', 
+    id_buscado: userIdFromUrl 
+  }, { status: 401 });
+
 }
 
     // 4. NORMALIZAÇÃO DE DADOS
