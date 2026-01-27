@@ -6,53 +6,49 @@ export const dynamic = 'force-dynamic';
 
 // 1. Definição ÚNICA e SEGURA do cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// DICA: Use a SERVICE_ROLE_KEY no backend para evitar bloqueios de RLS
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
-  // 1. Definimos o body FORA do try para o catch conseguir enxergá-lo
   let body: any;
 
   try {
     body = await req.json();
 
-    // 2. Captura o token tanto pela URL quanto pelo Header
+    // 2. IDENTIFICAÇÃO DINÂMICA (A Solução Definitiva)
     const { searchParams } = new URL(req.url);
-  const secret = 
-  searchParams.get('token') || 
-  searchParams.get('signature') || // Adicionado para capturar o que aparece no seu log
-  req.headers.get('x-hub-token');
+    const userIdFromUrl = searchParams.get('user_id');
 
-console.log("Secret identificado:", secret); // Adicione este log para conferir na Vercel
-
-    // 3. AUDITORIA: Salva o payload bruto imediatamente
+    // Mantemos o log para auditoria caso precise debugar
     await supabase.from('webhooks_log').insert({
       platform: 'kiwify',
       payload: body,
-      status: 'received'
+      status: 'received',
+      user_id: userIdFromUrl // Se sua tabela tiver essa coluna, ajuda muito
     });
 
-    // ... restante do seu código (Identificação do usuário, etc)
-    // 1. AUDITORIA: Salva o payload bruto imediatamente
-    await supabase.from('webhooks_log').insert({
-      platform: 'kiwify',
-      payload: body,
-      status: 'received'
-    });
-
-    // 2. IDENTIFICAÇÃO DO USUÁRIO
-    const { data: userConfig, error: configError } = await supabase
-      .from('user_configs')
-      .select('user_id, telegram_token, telegram_chat_id')
-      .eq('webhook_secret', secret)
-      .single();
-
-    if (configError || !userConfig) {
-      return NextResponse.json({ error: 'Secret inválido' }, { status: 401 });
+    if (!userIdFromUrl) {
+      return NextResponse.json({ error: 'user_id ausente na URL' }, { status: 400 });
     }
 
-    // 3. NORMALIZAÇÃO DE DADOS
+    // 3. BUSCA CONFIGURAÇÃO PELO ID DO USUÁRIO (Escalável)
+    // 3. BUSCA CONFIGURAÇÃO PELO ID DO USUÁRIO
+const { data: userConfig, error: configError } = await supabase
+  .from('user_configs')
+  .select('user_id, telegram_token, telegram_chat_id')
+  .eq('user_id', userIdFromUrl)
+  .maybeSingle(); // Usamos maybeSingle para não estourar erro se não achar
+
+if (configError || !userConfig) {
+  // LOG PARA VOCÊ VER NO PAINEL DA VERCEL O QUE DEU ERRADO
+  console.error("DEBUG WEBHOOK - Erro:", configError);
+  console.error("DEBUG WEBHOOK - ID Buscado:", userIdFromUrl);
+  return NextResponse.json({ error: 'Usuario nao configurado no banco' }, { status: 401 });
+}
+
+    // 4. NORMALIZAÇÃO DE DADOS
     const customer = body.Customer || body.customer || {};
     const productInfo = body.product || {};
     
@@ -61,14 +57,14 @@ console.log("Secret identificado:", secret); // Adicione este log para conferir 
       email: customer.email || body.email,
       mobile: customer.mobile || body.mobile || '',
       productName: body.product_name || productInfo.product_name || 'Produto Desconhecido',
-      externalProductId: body.product_id || productInfo.product_id || '000',
+      externalProductId: String(body.product_id || productInfo.product_id || '000'),
       status: body.status || body.order_status || 'waiting_payment',
       amount: (body.order_amount / 100) || body.amount || 0
     };
 
     if (!customerData.email) throw new Error('E-mail do cliente ausente');
 
-    // 4. UPSERT DO PRODUTO (Garante unicidade pelo external_id + user_id)
+    // 5. UPSERT DO PRODUTO
     const { data: productRecord, error: prodError } = await supabase
       .from('products')
       .upsert({ 
@@ -76,13 +72,13 @@ console.log("Secret identificado:", secret); // Adicione este log para conferir 
         name: customerData.productName, 
         user_id: userConfig.user_id,
         platform: 'kiwify' 
-      }, { onConflict: 'external_id, user_id' }) // Exige o Índice Único que sugeri
+      }, { onConflict: 'external_id, user_id' })
       .select()
       .single();
 
     if (prodError) throw prodError;
 
-    // 5. REGISTRO DA VENDA
+    // 6. REGISTRO DA VENDA
     const { error: dbError } = await supabase.from('sales_events').insert({
       user_id: userConfig.user_id,
       product_id: productRecord.id,
@@ -96,7 +92,7 @@ console.log("Secret identificado:", secret); // Adicione este log para conferir 
 
     if (dbError) throw dbError;
 
-    // 6. NOTIFICAÇÃO TELEGRAM
+    // 7. NOTIFICAÇÃO TELEGRAM
     if (userConfig.telegram_token && userConfig.telegram_chat_id) {
         const userBot = new TelegramBot(userConfig.telegram_token);
         const isAbandonment = !['paid', 'approved'].includes(customerData.status);
@@ -116,10 +112,9 @@ console.log("Secret identificado:", secret); // Adicione este log para conferir 
     return NextResponse.json({ success: true }, { status: 200 });
 
   } catch (error: any) {
-    // Registra o erro no log para auditoria
     await supabase.from('webhooks_log').insert({
       platform: 'kiwify',
-      payload: body,
+      payload: body || {},
       status: 'error',
       error_message: error.message
     });
