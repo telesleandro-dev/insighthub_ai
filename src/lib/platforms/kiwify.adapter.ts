@@ -13,17 +13,29 @@ export class KiwifyAdapter implements PlatformAdapter {
 
     /**
      * Detecta se o payload é da Kiwify
-     * Kiwify envia um objeto Customer e product_name
+     * Kiwify pode enviar dois formatos:
+     * 1. Formato antigo: com Customer e product_name
+     * 2. Formato novo: com checkout_link, email, name
      */
     detectPayload(payload: any): boolean {
-        return !!(
+        // Formato antigo: tem product_name e Customer
+        const hasOldFormat = !!(
             payload.product_name &&
             (payload.Customer || payload.customer)
         );
+
+        // Formato novo: tem checkout_link ou (email + name + id)
+        const hasNewFormat = !!(
+            payload.checkout_link ||
+            (payload.email && payload.name && payload.id && !payload.hottok && !payload.event)
+        );
+
+        return hasOldFormat || hasNewFormat;
     }
 
     /**
      * Normaliza dados do webhook Kiwify
+     * Suporta formato antigo e novo
      */
     normalizeData(payload: any): NormalizedSaleData {
         // Kiwify pode enviar Customer ou customer (case-insensitive)
@@ -38,14 +50,21 @@ export class KiwifyAdapter implements PlatformAdapter {
 
         // Extração e normalização de dados
         const customerName = customer.full_name || customer.name || payload.name || 'Cliente Sem Nome';
-        const customerPhone = customer.mobile || customer.phone || payload.mobile || '';
-        const productName = payload.product_name || productInfo.product_name || 'Produto Desconhecido';
-        const productId = String(payload.product_id || productInfo.product_id || '000');
+        const customerPhone = customer.mobile || customer.phone || payload.phone || payload.mobile || '';
 
-        // Kiwify envia valores em centavos
-        const amount = payload.order_amount
-            ? (payload.order_amount / 100)
-            : (payload.amount || 0);
+        // Produto: pode vir em product_name (antigo) ou offer_name (novo)
+        const productName = payload.product_name || payload.offer_name || productInfo.product_name || 'Produto Desconhecido';
+        const productId = String(payload.product_id || payload.offer_id || productInfo.product_id || payload.id || '000');
+
+        // Kiwify envia valores em centavos (order_amount) ou reais (amount/value)
+        let amount = 0;
+        if (payload.order_amount) {
+            amount = payload.order_amount / 100;
+        } else if (payload.amount) {
+            amount = typeof payload.amount === 'number' ? payload.amount : parseFloat(payload.amount) || 0;
+        } else if (payload.value) {
+            amount = typeof payload.value === 'number' ? payload.value : parseFloat(payload.value) || 0;
+        }
 
         const status = this.normalizeStatus(payload.status || payload.order_status || 'waiting_payment');
         const transactionId = payload.order_id || payload.transaction_id || payload.id || '';
@@ -65,6 +84,10 @@ export class KiwifyAdapter implements PlatformAdapter {
                 subscription_id: payload.subscription_id,
                 installments: payload.installments,
                 payment_method: payload.payment_method,
+                checkout_link: payload.checkout_link,
+                offer_name: payload.offer_name,
+                country: payload.country,
+                cpf: payload.cpf,
                 raw_status: payload.status
             }
         };
