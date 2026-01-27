@@ -19,7 +19,12 @@ export async function POST(req: Request) {
 
     // 2. Captura o token tanto pela URL quanto pelo Header
     const { searchParams } = new URL(req.url);
-    const secret = searchParams.get('token') || req.headers.get('x-hub-token');
+  const secret = 
+  searchParams.get('token') || 
+  searchParams.get('signature') || // Adicionado para capturar o que aparece no seu log
+  req.headers.get('x-hub-token');
+
+console.log("Secret identificado:", secret); // Adicione este log para conferir na Vercel
 
     // 3. AUDITORIA: Salva o payload bruto imediatamente
     await supabase.from('webhooks_log').insert({
