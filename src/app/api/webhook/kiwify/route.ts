@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import TelegramBot from 'node-telegram-bot-api';
 
-
 export const dynamic = 'force-dynamic';
 
 // 1. Definição ÚNICA e SEGURA do cliente Supabase
@@ -12,10 +11,24 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(req: Request) {
-   const body = await req.json();
-  const secret = req.headers.get('x-hub-token');
+  // 1. Definimos o body FORA do try para o catch conseguir enxergá-lo
+  let body: any;
 
   try {
+    body = await req.json();
+
+    // 2. Captura o token tanto pela URL quanto pelo Header
+    const { searchParams } = new URL(req.url);
+    const secret = searchParams.get('token') || req.headers.get('x-hub-token');
+
+    // 3. AUDITORIA: Salva o payload bruto imediatamente
+    await supabase.from('webhooks_log').insert({
+      platform: 'kiwify',
+      payload: body,
+      status: 'received'
+    });
+
+    // ... restante do seu código (Identificação do usuário, etc)
     // 1. AUDITORIA: Salva o payload bruto imediatamente
     await supabase.from('webhooks_log').insert({
       platform: 'kiwify',
