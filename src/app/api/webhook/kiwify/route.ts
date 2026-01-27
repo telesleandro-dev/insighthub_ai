@@ -5,11 +5,15 @@ import TelegramBot from 'node-telegram-bot-api';
 export const dynamic = 'force-dynamic';
 
 // 1. Definição ÚNICA e SEGURA do cliente Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-// DICA: Use a SERVICE_ROLE_KEY no backend para evitar bloqueios de RLS
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// LOG DE SEGURANÇA (Aparecerá nos logs da Vercel)
+if (!supabaseUrl || !supabaseKey) {
+  console.error("ERRO CRÍTICO: Variáveis do Supabase não encontradas!");
+}
+
+const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
 export async function POST(req: Request) {
   let body: any;
