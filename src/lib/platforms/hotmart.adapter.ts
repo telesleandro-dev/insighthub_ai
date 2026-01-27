@@ -6,7 +6,6 @@
  */
 
 import { PlatformAdapter, NormalizedSaleData, MissingDataError, SaleStatus } from './index';
-import crypto from 'crypto';
 
 export class HotmartAdapter implements PlatformAdapter {
     readonly name = 'hotmart';
