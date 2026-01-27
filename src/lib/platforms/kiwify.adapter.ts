@@ -25,9 +25,10 @@ export class KiwifyAdapter implements PlatformAdapter {
         );
 
         // Formato novo: tem checkout_link ou (email + name + id)
+        // Exclui sale_id (Eduzz) e hottok/event (Hotmart)
         const hasNewFormat = !!(
             payload.checkout_link ||
-            (payload.email && payload.name && payload.id && !payload.hottok && !payload.event)
+            (payload.email && payload.name && payload.id && !payload.hottok && !payload.event && !payload.sale_id)
         );
 
         return hasOldFormat || hasNewFormat;
