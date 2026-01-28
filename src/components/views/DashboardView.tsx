@@ -106,8 +106,8 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     const valorRecuperado = recuperadas.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
     const valorPipeline = pipeline.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
 
-    // 1. Gráfico Histórico (Echarts)
-    const grouped = aprovadas.reduce((acc: any, curr) => {
+    // 1. Gráfico Histórico (Echarts) - APENAS VENDAS RECUPERADAS
+    const grouped = recuperadas.reduce((acc: any, curr) => {
       const dateKey = new Date(curr.created_at).toISOString().split('T')[0];
       acc[dateKey] = (acc[dateKey] || 0) + (Number(curr.value) || 0);
       return acc;
@@ -149,24 +149,16 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
 
     setChartOption(option);
 
-    // 2. Produto Campeão (Foco Operacional)
+    // 2. Produto Campeão (Foco Operacional) - MAIOR VOLUME DE CARRINHOS ABANDONADOS
     const prodCounts: Record<string, number> = {};
-    pipeline.forEach(e => { // Focamos o produto campeão no PIPELINE (Onde tem dinheiro a recuperar)
+    const carrinhosAbandonados = filtered.filter(e => e.status !== 'paid' && e.status_abordagem === 'pendente');
+
+    carrinhosAbandonados.forEach(e => {
       const productName = Array.isArray(e.products)
         ? e.products[0]?.name
         : e.products?.name || e.product_name || 'Produto Não Localizado';
       prodCounts[productName] = (prodCounts[productName] || 0) + 1;
     });
-
-    // Se não tiver pipeline, usamos o histórico de vendas mesmo
-    if (pipeline.length === 0) {
-      aprovadas.forEach(e => {
-        const productName = Array.isArray(e.products)
-          ? e.products[0]?.name
-          : e.products?.name || e.product_name || 'Produto Não Localizado';
-        prodCounts[productName] = (prodCounts[productName] || 0) + 1;
-      });
-    }
 
     const topProductName = Object.keys(prodCounts).sort((a, b) => prodCounts[b] - prodCounts[a])[0] || "Nenhum";
 
