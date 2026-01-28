@@ -33,14 +33,18 @@ export function useAuth() {
 
         // 2. Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            console.log('Auth State Change Event:', _event);
             setUser(session?.user ?? null);
-            if (session?.user && !profile) {
+
+            if (session?.user) {
                 const { data } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
                 setProfile(data);
+            } else {
+                setProfile(null);
             }
         });
 
