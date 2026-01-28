@@ -171,7 +171,7 @@ export default function RecuperacaoView() {
     if (user) {
       fetchPendingLeads();
     }
-  }, [user]);
+  }, [user?.id]);
 
   if (authLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
