@@ -18,7 +18,7 @@ export default function AdminUsersView() {
 
     // Invite Modal State
     const [isInviteOpen, setIsInviteOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', handle: '' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', handle: '', role: 'user' });
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [inviteSuccess, setInviteSuccess] = useState(false);
@@ -67,7 +67,8 @@ export default function AdminUsersView() {
                 body: JSON.stringify({
                     email: inviteData.email,
                     name: inviteData.name,
-                    insighthub_email: fullHandle
+                    insighthub_email: fullHandle,
+                    role: inviteData.role
                 })
             });
 
@@ -88,7 +89,7 @@ export default function AdminUsersView() {
             fetchUsers();
             setTimeout(() => {
                 setIsInviteOpen(false);
-                setInviteData({ name: '', email: '', handle: '' });
+                setInviteData({ name: '', email: '', handle: '', role: 'user' });
                 setInviteSuccess(false);
             }, 2000);
 
@@ -460,6 +461,19 @@ export default function AdminUsersView() {
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-slate-400 ml-1">Usado para análise de inteligência.</p>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Função (Role)</label>
+                                    <select
+                                        value={inviteData.role}
+                                        onChange={e => setInviteData({ ...inviteData, role: e.target.value })}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-all text-slate-900"
+                                    >
+                                        <option value="user">Usuário</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 ml-1">Administradores podem gerenciar usuários.</p>
                                 </div>
 
                                 <button

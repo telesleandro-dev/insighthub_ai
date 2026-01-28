@@ -28,6 +28,8 @@ export default function ConfiguracoesView() {
   ]);
   const [visibleKeys, setVisibleKeys] = useState<{ [key: number]: boolean }>({});
   const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [telegramToken, setTelegramToken] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -53,7 +55,7 @@ export default function ConfiguracoesView() {
 
       const { data: configData } = await supabase
         .from('user_configs')
-        .select('telegram_enabled')
+        .select('telegram_enabled, telegram_token, telegram_chat_id')
         .eq('user_id', user!.id)
         .maybeSingle();
 
@@ -66,6 +68,8 @@ export default function ConfiguracoesView() {
         }
         if (configData) {
           setTelegramEnabled(configData.telegram_enabled ?? true);
+          setTelegramToken(configData.telegram_token || '');
+          setTelegramChatId(configData.telegram_chat_id || '');
         }
       }
     }
@@ -92,7 +96,13 @@ export default function ConfiguracoesView() {
       const response = await fetch('/api/settings/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, aiTone, apiKeys }),
+        body: JSON.stringify({
+          userId: user.id,
+          aiTone,
+          apiKeys,
+          telegramToken,
+          telegramChatId
+        }),
       });
 
       await supabase.from('user_configs').upsert({
@@ -393,6 +403,35 @@ export default function ConfiguracoesView() {
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 shadow-sm ${telegramEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
                 </button>
               </div>
+
+              {telegramEnabled && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 pt-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Bot Token</label>
+                    <input
+                      type="password"
+                      value={telegramToken}
+                      onChange={(e) => setTelegramToken(e.target.value)}
+                      placeholder="Ex: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-all font-mono text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Chat ID</label>
+                    <input
+                      type="text"
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      placeholder="Ex: 123456789"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-all font-mono text-slate-700"
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-400">
+                    Crie um bot no <a href="https://t.me/BotFather" target="_blank" className="text-blue-500 hover:underline">BotFather</a> e pegue o token e seu chat ID.
+                  </p>
+                </div>
+              )}
+
               <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-50 pt-3">
                 Receba notificações de novas vendas, abandonos de carrinho e insights de produto diretamente no seu celular.
               </p>

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     // 1. Extraímos os dados da requisição uma única vez
-    const { userId, aiTone, apiKeys } = await req.json();
+    const { userId, aiTone, apiKeys, telegramToken, telegramChatId } = await req.json();
 
     // 2. Inicializamos o Supabase com Service Role
     const supabase = createClient(
@@ -12,12 +12,17 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 3. Atualizar Tom de Voz em user_configs
-    await supabase.from('user_configs').upsert({
+    // 3. Atualizar configurações em user_configs (incluindo Telegram)
+    const updateData: any = {
       user_id: userId,
       ai_tone: aiTone,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+    };
+
+    if (telegramToken !== undefined) updateData.telegram_token = telegramToken;
+    if (telegramChatId !== undefined) updateData.telegram_chat_id = telegramChatId;
+
+    await supabase.from('user_configs').upsert(updateData, { onConflict: 'user_id' });
 
     // 4. Atualizar Chaves de API em user_platform_configs
     if (Array.isArray(apiKeys)) {

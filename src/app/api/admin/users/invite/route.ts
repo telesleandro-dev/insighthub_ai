@@ -56,13 +56,18 @@ export async function POST(req: NextRequest) {
 
         // 2. Parse Request Body
         const body = await req.json();
-        const { email, name, insighthub_email } = body;
+        const { email, name, insighthub_email, role = 'user' } = body;
 
         if (!email || !insighthub_email) {
             return NextResponse.json({ error: 'E-mail e Handle InsightHub são obrigatórios' }, { status: 400 });
         }
 
-        console.log(`Iniciando convite para: ${email} (${insighthub_email})`);
+        // Validate role
+        if (role !== 'user' && role !== 'admin') {
+            return NextResponse.json({ error: 'Role inválido. Use "user" ou "admin"' }, { status: 400 });
+        }
+
+        console.log(`Iniciando convite para: ${email} (${insighthub_email}) como ${role}`);
 
         // 3. Check if InsightHub Email is unique
         const { data: existingHandle, error: handleCheckError } = await supabaseAdmin
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
             data: {
                 name,
                 insighthub_email,
-                role: 'user'
+                role
             },
             redirectTo: `${siteUrl}/auth/callback?next=/definir-senha`
         });
