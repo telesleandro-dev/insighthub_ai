@@ -62,22 +62,26 @@ export class KiwifyAdapter implements PlatformAdapter {
         }
 
         // Extração e normalização de dados
-        const customerName = customer.full_name || customer.name || payload.name || 'Cliente Sem Nome';
+        const customerName = customer.full_name || customer.first_name || customer.name || payload.name || 'Cliente Sem Nome';
         const customerPhone = customer.mobile || customer.phone || payload.phone || payload.mobile || '';
 
-        // Produto: pode vir em product_name (antigo) ou offer_name (novo)
-        const productName = payload.product_name || payload.offer_name || productInfo.product_name || 'Produto Desconhecido';
-        const productId = String(payload.product_id || payload.offer_id || productInfo.product_id || payload.id || '000');
+        // Produto: Kiwify envia em Product.product_name (novo formato) ou product_name (antigo)
+        const productName = payload.Product?.product_name || payload.product_name || payload.offer_name || productInfo.product_name || 'Produto Desconhecido';
+        const productId = String(payload.Product?.product_id || payload.product_id || payload.offer_id || productInfo.product_id || payload.id || '000');
 
-        // Kiwify envia valores em centavos (order_amount) ou reais (amount/value)
+        // Kiwify envia valores em centavos em Commissions.charge_amount ou order_amount
         let amount = 0;
-        if (payload.order_amount) {
+        if (payload.Commissions?.charge_amount) {
+            amount = payload.Commissions.charge_amount / 100;
+        } else if (payload.order_amount) {
             amount = payload.order_amount / 100;
         } else if (payload.amount) {
             amount = typeof payload.amount === 'number' ? payload.amount : parseFloat(payload.amount) || 0;
         } else if (payload.value) {
             amount = typeof payload.value === 'number' ? payload.value : parseFloat(payload.value) || 0;
         }
+
+        console.log('[Kiwify] Dados extraídos:', { productName, productId, amount, customerName });
 
         const status = this.normalizeStatus(payload.status || payload.order_status || 'waiting_payment');
         const transactionId = payload.order_id || payload.transaction_id || payload.id || '';
