@@ -71,7 +71,14 @@ export default function AdminUsersView() {
                 })
             });
 
-            const data = await res.json();
+            let data;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(text || `Erro do servidor (${res.status})`);
+            }
 
             if (!res.ok) {
                 throw new Error(data.error || 'Erro ao convidar usuário');
@@ -86,7 +93,8 @@ export default function AdminUsersView() {
             }, 2000);
 
         } catch (err: any) {
-            setInviteError(err.message);
+            console.error("Invite Error:", err);
+            setInviteError(err.message || "Ocorreu um erro inesperado");
         } finally {
             setInviteLoading(false);
         }

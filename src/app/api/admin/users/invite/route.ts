@@ -4,9 +4,16 @@ import { NextRequest, NextResponse } from 'next/server';
 // We need the SERVICE_ROLE_KEY to perform admin actions (inviteUserByEmail)
 // This key bypasses RLS, so we must be very careful with it.
 // Ensure these environment variables are set in your .env.local
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+    console.error("CRITICAL: Supabase environment variables are missing!");
+}
+
 const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    supabaseUrl || '',
+    serviceRoleKey || '',
     {
         auth: {
             autoRefreshToken: false,
@@ -17,29 +24,23 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
     try {
+        // 0. Defensive check for configuration
+        if (!supabaseUrl || !serviceRoleKey) {
+            return NextResponse.json({ error: 'Server configuration error: Missing API Keys' }, { status: 500 });
+        }
+
         // 1. Verify if the requester is an Admin
-        // We can't trust the client-side session fully here for high-privilege actions without double-checking.
-        // However, since we are using the SERVICE_ROLE_KEY, we are already "God Mode".
-        // Ideally, we should parse the user's JWT from the request headers to check their role.
-        // For MVP simplicty: We assume middleware protects this route or we do a quick check if possible.
-
-        // BETTER APPROACH: Use the standard client to get the user, then check their role in the DB.
-        // But inviteUserByEmail REQUIRES service_role. 
-        // So the pattern is: 
-        //   a) Get current user from request header (Authorization: Bearer <token>)
-        //   b) Check if that user has role='admin' in public.profiles
-        //   c) If yes, proceed with supabaseAdmin.
-
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ error: 'Missing Authorization header' }, { status: 401 });
         }
 
         const token = authHeader.replace('Bearer ', '');
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
         if (userError || !user) {
-            return NextResponse.json({ error: 'Invalid Token' }, { status: 401 });
+            console.error("Auth verification failed:", userError?.message);
+            return NextResponse.json({ error: 'Acesso negado: Sessão inválida' }, { status: 401 });
         }
 
         // Check Role
@@ -47,48 +48,61 @@ export async function POST(req: NextRequest) {
             .from('profiles')
             .select('role')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
         if (profileError || profile?.role !== 'admin') {
-            return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 });
+            return NextResponse.json({ error: 'Acesso negado: Apenas administradores podem convidar usuários' }, { status: 403 });
         }
 
         // 2. Parse Request Body
-        const { email, name, insighthub_email } = await req.json();
+        const body = await req.json();
+        const { email, name, insighthub_email } = body;
 
         if (!email || !insighthub_email) {
-            return NextResponse.json({ error: 'Email and InsightHub Handle are required' }, { status: 400 });
+            return NextResponse.json({ error: 'E-mail e Handle InsightHub são obrigatórios' }, { status: 400 });
         }
 
+        console.log(`Iniciando convite para: ${email} (${insighthub_email})`);
+
         // 3. Check if InsightHub Email is unique
-        const { data: existingHandle } = await supabaseAdmin
+        const { data: existingHandle, error: handleCheckError } = await supabaseAdmin
             .from('profiles')
             .select('id')
             .eq('insighthub_email', insighthub_email)
-            .single();
+            .maybeSingle();
+
+        if (handleCheckError) {
+            console.error("Database check error:", handleCheckError);
+            return NextResponse.json({ error: 'Erro ao verificar disponibilidade do handle' }, { status: 500 });
+        }
 
         if (existingHandle) {
-            return NextResponse.json({ error: 'Identifier already in use' }, { status: 409 });
+            return NextResponse.json({ error: 'Este Identificador InsightHub já está em uso' }, { status: 409 });
         }
 
         // 4. Invite User via Supabase Auth
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+        console.log("Using Redirect URL:", `${siteUrl}/auth/callback?next=/definir-senha`);
+
         const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
                 name,
                 insighthub_email,
-                role: 'user' // Default to 'user' role
+                role: 'user'
             },
-            redirectTo: `${new URL(req.url).origin}/definir-senha` // Redirect to password set page
+            redirectTo: `${siteUrl}/auth/callback?next=/definir-senha`
         });
 
         if (inviteError) {
-            return NextResponse.json({ error: inviteError.message }, { status: 500 });
+            console.error("Supabase Invite Error:", inviteError.message);
+            return NextResponse.json({ error: `Erro no convite: ${inviteError.message}` }, { status: 500 });
         }
 
+        console.log("Convite enviado com sucesso para:", inviteData.user.id);
         return NextResponse.json({ success: true, userId: inviteData.user.id });
 
     } catch (err: any) {
-        console.error("Invite Error:", err);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error("Invite Exception:", err);
+        return NextResponse.json({ error: `Erro interno no servidor: ${err.message || 'Desconhecido'}` }, { status: 500 });
     }
 }

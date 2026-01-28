@@ -57,7 +57,7 @@ export default function LoginPage() {
       // MVP: Always show success message to prevent user enumeration, 
       // but actually trigger the reset if email exists.
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/definir-senha`,
       });
 
       // We don't throw error here to keep the "friendly" message always visible
