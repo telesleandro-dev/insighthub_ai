@@ -153,18 +153,13 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     const prodCounts: Record<string, number> = {};
     const carrinhosAbandonados = filtered.filter(e => e.status !== 'paid' && e.status_abordagem === 'pendente');
 
-    console.log('[Dashboard] Carrinhos abandonados:', carrinhosAbandonados.length);
-    console.log('[Dashboard] Amostra de eventos:', carrinhosAbandonados.slice(0, 2));
-
     carrinhosAbandonados.forEach(e => {
       const productName = Array.isArray(e.products)
         ? e.products[0]?.name
         : e.products?.name || e.product_name || 'Produto Não Localizado';
-      console.log('[Dashboard] Nome do produto extraído:', productName);
       prodCounts[productName] = (prodCounts[productName] || 0) + 1;
     });
 
-    console.log('[Dashboard] Contagem de produtos:', prodCounts);
     const topProductName = Object.keys(prodCounts).sort((a, b) => prodCounts[b] - prodCounts[a])[0] || "Nenhum";
 
     const platCounts: Record<string, number> = {};
@@ -327,8 +322,8 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             <p className="text-xs text-slate-400 mt-1">Acompanhamento diário para contexto.</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-slate-400 font-bold uppercase">Total no Período</p>
-            <p className="text-xl font-black text-slate-900">{metrics.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Total Recuperado</p>
+            <p className="text-xl font-black text-slate-900">{metrics.recuperado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
         </div>
 
