@@ -153,13 +153,18 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     const prodCounts: Record<string, number> = {};
     const carrinhosAbandonados = filtered.filter(e => e.status !== 'paid' && e.status_abordagem === 'pendente');
 
+    console.log('[Dashboard] Carrinhos abandonados:', carrinhosAbandonados.length);
+    console.log('[Dashboard] Amostra de eventos:', carrinhosAbandonados.slice(0, 2));
+
     carrinhosAbandonados.forEach(e => {
       const productName = Array.isArray(e.products)
         ? e.products[0]?.name
         : e.products?.name || e.product_name || 'Produto Não Localizado';
+      console.log('[Dashboard] Nome do produto extraído:', productName);
       prodCounts[productName] = (prodCounts[productName] || 0) + 1;
     });
 
+    console.log('[Dashboard] Contagem de produtos:', prodCounts);
     const topProductName = Object.keys(prodCounts).sort((a, b) => prodCounts[b] - prodCounts[a])[0] || "Nenhum";
 
     const platCounts: Record<string, number> = {};
