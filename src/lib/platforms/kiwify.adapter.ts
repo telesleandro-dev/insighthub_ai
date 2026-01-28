@@ -48,6 +48,9 @@ export class KiwifyAdapter implements PlatformAdapter {
      * Suporta formato antigo e novo
      */
     normalizeData(payload: any): NormalizedSaleData {
+        // DEBUG: Log completo do payload para diagnóstico
+        console.log('[Kiwify] Payload completo recebido:', JSON.stringify(payload, null, 2));
+
         // Kiwify pode enviar Customer ou customer (case-insensitive)
         const customer = payload.Customer || payload.customer || {};
         const productInfo = payload.product || {};
