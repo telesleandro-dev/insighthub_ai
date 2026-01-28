@@ -13,9 +13,10 @@ export class KiwifyAdapter implements PlatformAdapter {
 
     /**
      * Detecta se o payload é da Kiwify
-     * Kiwify pode enviar dois formatos:
+     * Kiwify pode enviar três formatos:
      * 1. Formato antigo: com Customer e product_name
      * 2. Formato novo: com checkout_link, email, name
+     * 3. Formato mais recente: com order_id, order_status, store_id
      */
     detectPayload(payload: any): boolean {
         // Formato antigo: tem product_name e Customer
@@ -31,7 +32,15 @@ export class KiwifyAdapter implements PlatformAdapter {
             (payload.email && payload.name && payload.id && !payload.hottok && !payload.event && !payload.sale_id)
         );
 
-        return hasOldFormat || hasNewFormat;
+        // Formato mais recente: order_id, order_status, store_id
+        // Unique to Kiwify: store_id and order_ref combination
+        const hasNewestFormat = !!(
+            payload.order_id &&
+            payload.store_id &&
+            payload.order_status
+        );
+
+        return hasOldFormat || hasNewFormat || hasNewestFormat;
     }
 
     /**
