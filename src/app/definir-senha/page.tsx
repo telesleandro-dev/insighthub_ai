@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Lock, CheckCircle, Loader2, AlertCircle, BrainCircuit } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function DefinirSenhaPage() {
     const router = useRouter();
+    const { user, loading: authLoading } = useAuth();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +50,14 @@ export default function DefinirSenhaPage() {
             setLoading(false);
         }
     };
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-600" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#020617] flex items-center justify-center p-4 font-sans">
