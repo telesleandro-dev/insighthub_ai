@@ -16,9 +16,24 @@ export default function DefinirSenhaPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    // Check if user is authenticated after auth completes loading
+    useEffect(() => {
+        if (!authLoading && !user) {
+            console.error('❌ [DEFINIR SENHA] Usuário não autenticado');
+            setError('Sessão não encontrada. Por favor, clique novamente no link enviado por e-mail.');
+        } else if (user) {
+            console.log('✅ [DEFINIR SENHA] Usuário autenticado:', user.email);
+        }
+    }, [authLoading, user]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+
+        if (!user) {
+            setError('Você precisa estar autenticado. Clique novamente no link do e-mail.');
+            return;
+        }
 
         if (password.length < 6) {
             setError('A senha deve ter pelo menos 6 caracteres.');
