@@ -10,7 +10,7 @@ export default function Home() {
           <div className="bg-blue-600 p-2 rounded-lg"><BrainCircuit size={24} /></div>
           <span className="text-xl font-bold italic">InsightHub AI</span>
         </div>
-        <a href="/dashboard" className="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full text-sm font-medium transition-all">
+        <a href="/login" className="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full text-sm font-medium transition-all">
           Acessar Dashboard
         </a>
       </nav>
@@ -23,7 +23,7 @@ export default function Home() {
           Monitore vendas da Kiwify em tempo real e recupere carrinhos com auxílio de IA.
         </p>
         <div className="flex justify-center gap-4">
-          <a href="/dashboard" className="bg-white text-black px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-all">
+          <a href="/login" className="bg-white text-black px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-all">
             Começar Agora <ChevronRight size={20} />
           </a>
         </div>
@@ -37,7 +37,7 @@ export default function Home() {
           <div className="p-8 rounded-2xl bg-slate-900/50 border border-slate-800">
             <BarChart3 className="text-indigo-400 mb-4" size={32} />
             <h3 className="text-xl font-bold mb-2">Dashboard Real-time</h3>
-            <p className="text-slate-400">Acompanhe suas métricas de faturamento e conversão instantaneamente.</p> 
+            <p className="text-slate-400">Acompanhe suas métricas de faturamento e conversão instantaneamente.</p>
           </div>
           <div className="p-8 rounded-2xl bg-slate-900/50 border border-slate-800">
             <BrainCircuit className="text-purple-400 mb-4" size={32} />

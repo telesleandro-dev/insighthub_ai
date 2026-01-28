@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  RefreshCcw, 
-  Search, 
-  MessageCircle, 
-  ExternalLink, 
-  PencilLine, 
-  Loader2, 
-  Tag, 
-  DollarSign, 
-  Users, 
+import {
+  RefreshCcw,
+  Search,
+  MessageCircle,
+  ExternalLink,
+  PencilLine,
+  Loader2,
+  Tag,
+  DollarSign,
+  Users,
   Ticket,
   Filter,
   CheckCircle2,
@@ -18,14 +18,17 @@ import {
   TrendingUp, // Ícone para os cards
   Clock       // Ícone para os cards
 } from "lucide-react";
-import { DiscountModal } from '../ui/modalls/DiscountModal'; 
+import { DiscountModal } from '../ui/modalls/DiscountModal';
 import { supabase } from '@/lib/supabase';
 
+import { useAuth } from '@/hooks/useAuth';
+
 export default function RecuperacaoView() {
+  const { user, loading: authLoading } = useAuth();
   const [leads, setLeads] = useState<any[]>([]);
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [loadingIA, setLoadingIA] = useState<string | null>(null);
-  
+
   const [filter, setFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all'); // NOVO: Estado para o filtro de status
@@ -40,25 +43,25 @@ export default function RecuperacaoView() {
     .reduce((acc, lead) => acc + Number(lead.value || 0), 0);
 
   const totalRecuperados = leads.filter(l => l.status_abordagem === 'recuperado').length;
-  const taxaConversao = leads.length > 0 
-    ? ((totalRecuperados / leads.length) * 100).toFixed(1) 
+  const taxaConversao = leads.length > 0
+    ? ((totalRecuperados / leads.length) * 100).toFixed(1)
     : "0.0";
 
   const plataformasDisponiveis = Array.from(new Set(leads.map(l => l.platform_origin).filter(Boolean)));
 
   // Lógica de filtro atualizada para incluir o Status
   const leadsFiltrados = leads.filter(lead => {
-    const passaCategoria = 
-      filter === 'all' || 
+    const passaCategoria =
+      filter === 'all' ||
       (filter === 'high_value' && Number(lead.value) >= 500) ||
       (filter === 'with_offer' && !!lead.custom_discount_link);
 
-    const passaPlataforma = 
-      platformFilter === 'all' || 
+    const passaPlataforma =
+      platformFilter === 'all' ||
       lead.platform_origin === platformFilter;
 
-    const passaStatus = 
-      statusFilter === 'all' || 
+    const passaStatus =
+      statusFilter === 'all' ||
       (lead.status_abordagem || 'pendente') === statusFilter;
 
     return passaCategoria && passaPlataforma && passaStatus;
@@ -69,13 +72,27 @@ export default function RecuperacaoView() {
   const leadsComOferta = leads.filter(l => l.custom_discount_link).length;
 
   const atualizarStatusAbordagem = async (leadId: string, novoStatus: string) => {
-    const { error } = await supabase
-      .from('sales_events')
-      .update({ status_abordagem: novoStatus })
-      .eq('id', leadId);
+    try {
+      const response = await fetch('/api/leads/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ leadId, status: novoStatus }),
+      });
 
-    if (!error) {
-      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status_abordagem: novoStatus } : l));
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro na API');
+      }
+
+      // Atualiza estado local apenas se sucesso no servidor
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status_abordagem: novoStatus } : l)));
+      console.log(`✅ Status salvo via API: ${novoStatus} para ${leadId}`);
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar status:', error);
+      alert(`Erro ao salvar status: ${error.message || 'Falha de conexão'}`);
     }
   };
 
@@ -95,22 +112,22 @@ export default function RecuperacaoView() {
       const response = await fetch('/api/ai/recuperar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           leadId: lead.id,
           productName: lead.product_name || 'nosso produto',
           customerName: lead.customer_name
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.message) {
         const telefoneLimpo = lead.customer_phone?.replace(/\D/g, '') || '';
         const url = `https://wa.me/55${telefoneLimpo}?text=${encodeURIComponent(data.message)}`;
         window.open(url, '_blank');
-        
+
         if ((lead.status_abordagem || 'pendente') === 'pendente') {
-            atualizarStatusAbordagem(lead.id, 'contatado');
+          await atualizarStatusAbordagem(lead.id, 'contatado');
         }
       } else {
         alert("Erro na Bruna: " + (data.error || "Tente novamente."));
@@ -127,41 +144,47 @@ export default function RecuperacaoView() {
   };
 
   const handleLinkSaved = async () => {
-    await fetchPendingLeads(); 
+    await fetchPendingLeads();
     setSelectedLead(null);
   };
 
   async function fetchPendingLeads() {
-  const { data, error } = await supabase
-    .from('sales_events')
-    .select(`
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('sales_events')
+      .select(`
       *,
       products (
         name
       )
     `) // Adicionamos o join para o nome do produto não vir "Sem Nome"
-    .eq('user_id', 'c048be53-fff6-4446-a8b8-6abf79fce171') // Filtro de segurança (Pilar 3)
-    .neq('status', 'paid') // "neq" significa "não é igual a". Traz tudo que não é pago.
-    .order('created_at', { ascending: false });
+      .eq('user_id', user!.id) // Filtro de segurança (Pilar 3)
+      .neq('status', 'paid') // "neq" significa "não é igual a". Traz tudo que não é pago.
+      .order('created_at', { ascending: false });
 
-  if (data) setLeads(data);
-  if (error) console.error("Erro ao buscar leads:", error);
-}
+    if (data) setLeads(data);
+    if (error) console.error("Erro ao buscar leads:", error);
+  }
 
   useEffect(() => {
-    fetchPendingLeads();
-  }, []);
+    if (user) {
+      fetchPendingLeads();
+    }
+  }, [user]);
+
+  if (authLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
   return (
     <div className="p-8 space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Recuperação de Vendas</h2>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           {/* NOVO: Filtro de Status de Abordagem */}
           <div className="relative flex items-center">
             <LayoutGrid size={14} className="absolute left-3 text-slate-400" />
-            <select 
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
@@ -176,7 +199,7 @@ export default function RecuperacaoView() {
 
           <div className="relative flex items-center">
             <Filter size={14} className="absolute left-3 text-slate-400" />
-            <select 
+            <select
               value={platformFilter}
               onChange={(e) => setPlatformFilter(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
@@ -194,12 +217,11 @@ export default function RecuperacaoView() {
               { id: 'high_value', label: 'Tickets R$ 500+' },
               { id: 'with_offer', label: 'Com Oferta' }
             ].map((btn) => (
-              <button 
+              <button
                 key={btn.id}
                 onClick={() => setFilter(btn.id)}
-                className={`px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-black transition-all ${
-                  filter === btn.id ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-black transition-all ${filter === btn.id ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
               >
                 {btn.label}
               </button>
@@ -219,7 +241,7 @@ export default function RecuperacaoView() {
             {faturamentoRecuperado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </h3>
           <p className="mt-2 text-[10px] font-bold text-emerald-100 uppercase">
-             {taxaConversao}% de Conversão
+            {taxaConversao}% de Conversão
           </p>
         </div>
 
@@ -304,7 +326,7 @@ export default function RecuperacaoView() {
                     </select>
                   </div>
                 </td>
-                
+
                 <td className="px-6 py-4">
                   <span className="text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
                     {lead.product_name || 'Produto não identificado'}
@@ -317,16 +339,16 @@ export default function RecuperacaoView() {
 
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-2">
-                    <button 
+                    <button
                       onClick={() => abordarComIA(lead)}
                       disabled={loadingIA === lead.id}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-50"
-                      title="Abordar com Bruna IA"
+                      title="Abordar com a IA"
                     >
                       {loadingIA === lead.id ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
                     </button>
 
-                    <button 
+                    <button
                       onClick={() => setSelectedLead(lead)}
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-xl transition-all"
                       title="Configurar Desconto"
@@ -334,7 +356,7 @@ export default function RecuperacaoView() {
                       <PencilLine size={18} />
                     </button>
 
-                    <button 
+                    <button
                       onClick={() => handleOpenCheckout(lead.checkout_url)}
                       className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
                       title="Abrir Checkout"
@@ -350,10 +372,10 @@ export default function RecuperacaoView() {
       </div>
 
       {selectedLead && (
-        <DiscountModal 
-          lead={selectedLead} 
-          onClose={() => setSelectedLead(null)} 
-          onSave={handleLinkSaved} 
+        <DiscountModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onSave={handleLinkSaved}
         />
       )}
     </div>

@@ -4,13 +4,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Copy, Check, Globe, Key, ShieldCheck, Plus,
   Trash2, MessageCircle, FileUp, Save, Loader2, Brain, CheckCircle,
-  Eye, EyeOff, Info, Activity, ChevronDown, LayoutDashboard, Database, Bell
+  Eye, EyeOff, Info, Activity, ChevronDown, LayoutDashboard, Database, Bell, Mail, Zap
 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
-const USER_ID = 'c048be53-fff6-4446-a8b8-6abf79fce171';
-
-// Configuração das plataformas e seus campos específicos
 const PLATFORM_OPTIONS = [
   { id: 'kiwify', name: 'Kiwify', label: 'API Key (Opcional)', placeholder: 'Cole sua API Key da Kiwify' },
   { id: 'hotmart', name: 'Hotmart', label: 'Token de Segurança (H-Token)', placeholder: 'O H-Token gerado na Hotmart' },
@@ -19,11 +17,12 @@ const PLATFORM_OPTIONS = [
 ];
 
 export default function ConfiguracoesView() {
+  const { user, profile, loading: authLoading } = useAuth();
   const [copied, setCopied] = useState(false);
-  const webhookUrl = `http://localhost:3000/api/webhook/unified?user_id=${USER_ID}`;
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [aiTone, setAiTone] = useState('consultivo');
+  const [activeTab, setActiveTab] = useState<'webhook' | 'email'>('webhook');
   const [apiKeys, setApiKeys] = useState([
     { name: 'kiwify', value: '' }
   ]);
@@ -32,28 +31,30 @@ export default function ConfiguracoesView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const webhookUrl = user ? `https://insighthub.ai/api/webhook/unified?user_id=${user.id}` : 'Carregando...';
+
   // Dados para os feedbacks visuais de Tom de Voz
   const toneData = {
-    persuasivo: { desc: "fechamento", ex: "Últimas horas para garantir sua vaga com desconto! Vamos fechar?" },
-    consultivo: { desc: "esclarecer objeções", ex: "Vi que ficou com dúvida no checkout. Qual detalhe posso esclarecer?" },
-    cordial: { desc: "relacionamento", ex: "Olá! Notei que não concluiu seu pedido. Posso te ajudar?" }
+    persuasivo: { title: "Lobo de Wall Street", desc: "Focado em fechamento e escassez.", ex: "Últimas horas com desconto!" },
+    consultivo: { title: "Consultor Técnico", desc: "Esclarece dúvidas e gera confiança.", ex: "Vi que ficou com dúvida..." },
+    cordial: { title: "Amigo Próximo", desc: "Foco em relacionamento e empatia.", ex: "Olá! Posso te ajudar?" }
   };
 
   useEffect(() => {
     let isMounted = true;
+    if (!user) return;
+
     async function loadSettings() {
-      // Carregar configurações de user_settings (antigo/legado mas persistente no front)
       const { data: settingsData } = await supabase
         .from('user_settings')
         .select('ai_tone, api_keys')
-        .eq('user_id', USER_ID)
+        .eq('user_id', user!.id)
         .maybeSingle();
 
-      // Carregar configurações de user_configs (onde o Telegram está)
       const { data: configData } = await supabase
         .from('user_configs')
         .select('telegram_enabled')
-        .eq('user_id', USER_ID)
+        .eq('user_id', user!.id)
         .maybeSingle();
 
       if (isMounted) {
@@ -70,7 +71,9 @@ export default function ConfiguracoesView() {
     }
     loadSettings();
     return () => { isMounted = false; };
-  }, []);
+  }, [user]);
+
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const addKeyField = () => setApiKeys([...apiKeys, { name: 'kiwify', value: '' }]);
   const removeKeyField = (index: number) => setApiKeys(apiKeys.filter((_, i) => i !== index));
@@ -82,18 +85,17 @@ export default function ConfiguracoesView() {
   };
 
   const handleSaveAll = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      // 1. Salvar na API centralizada que cuida de várias tabelas
       const response = await fetch('/api/settings/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: USER_ID, aiTone, apiKeys }),
+        body: JSON.stringify({ userId: user.id, aiTone, apiKeys }),
       });
 
-      // 2. Salvar flag do telegram separadamente em user_configs via Supabase direto (mais rápido e seguro)
       await supabase.from('user_configs').upsert({
-        user_id: USER_ID,
+        user_id: user.id,
         telegram_enabled: telegramEnabled,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
@@ -111,8 +113,8 @@ export default function ConfiguracoesView() {
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(webhookUrl);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -131,185 +133,273 @@ export default function ConfiguracoesView() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-2 md:p-4 animate-in fade-in duration-500 overflow-hidden">
-      <div className="max-w-7xl mx-auto space-y-4">
+    <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 animate-in fade-in duration-500 overflow-x-hidden">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-        {/* Header Compacto */}
-        <header className="flex justify-between items-center gap-4 bg-white px-5 py-3 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-lg shadow-md shadow-blue-100">
-              <LayoutDashboard className="text-white" size={18} />
+        {/* HEADER */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white px-6 py-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-600 p-2.5 rounded-lg shadow-blue-200 shadow-lg">
+              <LayoutDashboard className="text-white" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight leading-none mb-1">Configurações</h2>
-              <p className="text-[10px] font-medium text-slate-500">Tudo em uma única tela para seu InsightHub.</p>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Configurações</h2>
+              <p className="text-xs text-slate-500 font-medium">Gerencie suas integrações e preferências da IA.</p>
             </div>
           </div>
           <button
             onClick={handleSaveAll}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 text-xs"
+            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 text-sm"
           >
-            {loading ? <Loader2 className="animate-spin" size={14} /> : saved ? <CheckCircle size={14} /> : <Save size={14} />}
-            <span>{saved ? 'Salvo!' : 'Salvar Alterações'}</span>
+            {loading ? <Loader2 className="animate-spin" size={16} /> : saved ? <CheckCircle size={16} /> : <Save size={16} />}
+            <span>{saved ? 'Salvo com Sucesso!' : 'Salvar Alterações'}</span>
           </button>
         </header>
 
-        {/* Row 1: Webhook e Telegram */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* LAYOUT PRINCIPAL: 2 COLUNAS (3/4 + 1/4) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-          <section className="md:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center gap-2">
-              <Globe className="text-blue-600" size={16} />
-              <h3 className="font-bold text-slate-800 text-sm">Webhook Unificado</h3>
-            </div>
-            <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 group">
-              <code className="text-[10px] text-slate-500 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
-              <button onClick={copyToClipboard} className="p-1.5 bg-white rounded border border-slate-200 text-slate-400 hover:text-blue-600 transition-all">
-                {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-              </button>
-            </div>
-            <div className="flex items-center gap-3 px-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Aguardando Webhooks</span>
-              </div>
-              <div className="w-px h-2 bg-slate-200" />
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <ShieldCheck size={12} />
-                <span className="text-[10px] font-medium">Criptografia SSL ativa</span>
-              </div>
-            </div>
-          </section>
+          {/* COLUNA ESQUERDA: Integrações Técnicas (span-8) */}
+          <div className="lg:col-span-8 space-y-6">
 
-          {/* Telegram Switch Ativado */}
-          <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-50 p-1.5 rounded-md">
-                  <Bell className="text-blue-600" size={16} />
+            {/* CARD 1: CANAIS DE ENTRADA (Tabs) */}
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="text-amber-500" size={18} />
+                  <h3 className="font-bold text-slate-800 text-sm">Canais de Entrada de Dados</h3>
                 </div>
-                <div>
-                  <h4 className="font-bold text-slate-800 text-xs">Avisos Telegram</h4>
-                  <p className="text-[9px] text-slate-400 font-medium tracking-tight">Vendas e Abandonos</p>
+                {/* Tabs Switcher */}
+                <div className="flex bg-slate-200/50 p-1 rounded-lg self-start">
+                  <button
+                    onClick={() => setActiveTab('webhook')}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'webhook' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Webhook
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('email')}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    E-mail
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => setTelegramEnabled(!telegramEnabled)}
-                className={`w-10 h-5 rounded-full relative transition-colors duration-200 ${telegramEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
-              >
-                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${telegramEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <div className={`text-[9px] font-bold p-2 rounded-lg text-center transition-colors ${telegramEnabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
-              NOTIFICAÇÕES {telegramEnabled ? 'ATIVADAS' : 'DESATIVADAS'}
-            </div>
-          </section>
-        </div>
 
-        {/* Row 2: Conectores e IA */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-
-          <section className="md:col-span-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Key className="text-blue-600" size={16} />
-                <h3 className="font-bold text-slate-800 text-sm">Conectores de Dados</h3>
-              </div>
-              <button onClick={addKeyField} className="text-blue-600 px-2 py-1 rounded text-[10px] font-black hover:bg-blue-50 transition-colors uppercase tracking-widest border border-blue-100">
-                + Adicionar
-              </button>
-            </div>
-
-            <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-              {apiKeys.map((key, index) => {
-                const platformConfig = PLATFORM_OPTIONS.find(p => p.id === key.name) || PLATFORM_OPTIONS[0];
-                return (
-                  <div key={index} className="flex gap-2 items-end bg-slate-50/50 p-2 rounded-lg border border-slate-100/50">
-                    <div className="w-1/3">
-                      <select
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none"
-                        value={key.name}
-                        onChange={(e) => updateKey(index, 'name', e.target.value)}
-                      >
-                        {PLATFORM_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
-                      </select>
+              <div className="p-6">
+                {activeTab === 'webhook' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
+                        URL única para receber notificações de venda da <strong>Kiwify, Hotmart, Eduzz ou Monetizze</strong>. Copie e cole na configuração de webhook da sua plataforma.
+                      </p>
+                      <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Ativo
+                      </span>
                     </div>
-                    <div className="flex-1 relative">
-                      <input
-                        type={visibleKeys[index] ? "text" : "password"}
-                        placeholder={platformConfig.label}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-medium text-slate-900 outline-none"
-                        value={key.value}
-                        onChange={(e) => updateKey(index, 'value', e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setVisibleKeys(prev => ({ ...prev, [index]: !prev[index] }))}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
-                      >
-                        {visibleKeys[index] ? <EyeOff size={12} /> : <Eye size={12} />}
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 group hover:border-blue-200 transition-colors">
+                      <Globe className="text-slate-400" size={16} />
+                      <code className="text-[11px] text-slate-600 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
+                      <button onClick={() => copyToClipboard(webhookUrl)} className="p-2 bg-white rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition-all shadow-sm">
+                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                       </button>
                     </div>
-                    <button onClick={() => removeKeyField(index)} className="text-slate-300 hover:text-red-500 p-1.5">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-2 px-1">
+                      <ShieldCheck size={12} className="text-slate-400" />
+                      <span className="text-[10px] text-slate-400 font-medium">Conexão segura via SSL (HTTPS)</span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                )}
 
-          <section className="md:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="text-blue-600" size={16} />
-              <h3 className="font-bold text-slate-800 text-sm">Personalidade IA</h3>
-            </div>
-            <div className="grid grid-cols-1 gap-1.5">
-              {(['persuasivo', 'consultivo', 'cordial'] as const).map((tone) => (
-                <button
-                  key={tone}
-                  onClick={() => setAiTone(tone)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[10px] font-bold transition-all ${aiTone === tone ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-100 text-slate-400 hover:bg-slate-50'
-                    }`}
-                >
-                  <span>{tone.toUpperCase()} <span className="font-normal lowercase text-[9px] ml-1 opacity-60">({toneData[tone].desc})</span></span>
-                  {aiTone === tone && <CheckCircle size={12} />}
+                {activeTab === 'email' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
+                      Encaminhe e-mails de dúvidas de leads para este endereço. Nossa IA analisará o conteúdo e gerará insights no menu <strong>Inteligência de Produto</strong>.
+                    </p>
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 group hover:border-blue-200 transition-colors">
+                      <Mail className="text-slate-400" size={16} />
+                      <code className="text-[11px] text-slate-600 flex-1 truncate font-mono font-bold select-all">
+                        insights+usuario_demo@insighthub.ai
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard("insights+usuario_demo@insighthub.ai")}
+                        className="p-2 bg-white rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition-all shadow-sm"
+                      >
+                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 px-1 text-amber-600 bg-amber-50 w-fit px-2 py-1 rounded">
+                      <Info size={12} />
+                      <span className="text-[10px] font-bold">Endereço exclusivo. Não compartilhe publicamente.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* CARD 2: CONECTORES DE API */}
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <Key className="text-blue-600" size={18} />
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm">Chaves de API</h3>
+                    <p className="text-[10px] text-slate-400 font-medium">Conecte suas contas para importar dados históricos.</p>
+                  </div>
+                </div>
+                <button onClick={addKeyField} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors flex items-center gap-1">
+                  <Plus size={12} /> Adicionar
                 </button>
-              ))}
-            </div>
-            <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-              <p className="text-[10px] text-slate-600 italic leading-tight">
+              </div>
+
+              <div className="space-y-3">
+                {apiKeys.map((key, index) => {
+                  const platformConfig = PLATFORM_OPTIONS.find(p => p.id === key.name) || PLATFORM_OPTIONS[0];
+                  return (
+                    <div key={index} className="flex gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:shadow-sm">
+                      <div className="w-1/3 min-w-[120px]">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Plataforma</label>
+                        <div className="relative">
+                          <select
+                            className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                            value={key.name}
+                            onChange={(e) => updateKey(index, 'name', e.target.value)}
+                          >
+                            {PLATFORM_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Credencial</label>
+                        <div className="relative">
+                          <input
+                            type={visibleKeys[index] ? "text" : "password"}
+                            placeholder={platformConfig.placeholder}
+                            className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-[11px] font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-300"
+                            value={key.value}
+                            onChange={(e) => updateKey(index, 'value', e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setVisibleKeys(prev => ({ ...prev, [index]: !prev[index] }))}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 p-1"
+                          >
+                            {visibleKeys[index] ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                      <button onClick={() => removeKeyField(index)} className="mt-6 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* CARD 3: BASE DE CONHECIMENTO */}
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="bg-slate-100 p-3 rounded-xl">
+                  <Database className="text-slate-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm mb-1">Base de Conhecimento Local</h3>
+                  <p className="text-xs text-slate-500 max-w-sm">
+                    Carregue manuais, FAQs ou PDFs do seu produto. A IA usará esses arquivos para responder dúvidas com precisão.
+                  </p>
+                </div>
+              </div>
+              <div className="w-full md:w-auto">
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.doc,.docx,.txt" />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-slate-200 active:scale-95"
+                >
+                  <FileUp size={16} />
+                  <span>{uploading ? 'ENVIANDO...' : 'CARREGAR ARQUIVO'}</span>
+                </button>
+              </div>
+            </section>
+
+          </div>
+
+          {/* COLUNA DIREITA: Preferências e Comportamento (span-4) */}
+          <div className="lg:col-span-4 space-y-6">
+
+            {/* CARD 4: PERSONALIDADE IA */}
+            <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Brain className="text-purple-600" size={18} />
+                <h3 className="font-bold text-slate-800 text-sm">Personalidade da IA</h3>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {(Object.entries(toneData) as [string, any][]).map(([key, data]) => {
+                  const isSelected = aiTone === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setAiTone(key)}
+                      className={`relative group flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected
+                        ? 'border-purple-600 bg-purple-50 shadow-sm'
+                        : 'border-transparent bg-slate-50 hover:bg-slate-100 hover:border-slate-200'
+                        }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${isSelected ? 'border-purple-600' : 'border-slate-300 group-hover:border-slate-400'}`}>
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-purple-600" />}
+                      </div>
+                      <div>
+                        <span className={`text-xs font-bold block mb-0.5 ${isSelected ? 'text-purple-900' : 'text-slate-700'}`}>
+                          {data.title}
+                        </span>
+                        <span className="text-[10px] text-slate-500 leading-tight block">
+                          {data.desc}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="bg-slate-900 text-slate-300 p-4 rounded-xl text-[10px] italic leading-relaxed relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-2 opacity-10">
+                  <MessageCircle size={40} />
+                </div>
+                <span className="font-bold text-purple-400 not-italic block mb-1">Exemplo de resposta:</span>
                 "{toneData[aiTone as keyof typeof toneData].ex}"
+              </div>
+            </section>
+
+            {/* CARD 5: NOTIFICAÇÕES (Telegram) */}
+            <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-100 p-2 rounded-lg">
+                    <Bell className="text-blue-600" size={16} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-xs">Telegram</h4>
+                    <p className="text-[9px] text-slate-400 font-medium">Alertas em tempo real</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setTelegramEnabled(!telegramEnabled)}
+                  className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${telegramEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 shadow-sm ${telegramEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-50 pt-3">
+                Receba notificações de novas vendas, abandonos de carrinho e insights de produto diretamente no seu celular.
               </p>
-            </div>
-          </section>
+            </section>
+
+          </div>
+
         </div>
-
-        {/* Row 3: Base Local Embaixo */}
-        <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-lg shadow-sm">
-              <Database className="text-white" size={16} />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm">Base de Conhecimento Local</h3>
-              <p className="text-[10px] text-slate-400 font-medium">Carregue manuais ou PDFs para treinar as respostas da sua IA.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.doc,.docx,.txt" />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all"
-            >
-              <FileUp size={14} />
-              <span>{uploading ? 'ENVIANDO...' : 'UPLOAD DE ARQUIVOS'}</span>
-            </button>
-          </div>
-        </section>
-
       </div>
     </div>
   );
