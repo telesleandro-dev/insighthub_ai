@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { DollarSign, Users, Target, TrendingUp, Award, Share2, Loader2, AlertCircle, ArrowRight, Rocket } from "lucide-react";
 import ReactECharts from 'echarts-for-react';
 import { supabase } from "@/lib/supabase";
+import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardViewProps {
   onNavigate?: (section: string) => void;
 }
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [rawEvents, setRawEvents] = useState<any[]>([]);
   const [platformFilter, setPlatformFilter] = useState('all');
@@ -31,6 +33,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
 
   useEffect(() => {
     async function loadData() {
+      if (!user?.id) return;
       setLoading(true);
 
       const { data, error } = await supabase
@@ -50,7 +53,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             name
           )
         `)
-        .eq('user_id', 'c048be53-fff6-4446-a8b8-6abf79fce171');
+        .eq('user_id', user.id);
 
       if (error) {
         console.error("Erro Supabase:", error);
@@ -69,7 +72,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     }
 
     loadData();
-  }, []);
+  }, [user?.id]);
 
   const processDashboard = (events: any[], platform: string, range: string) => {
     const now = new Date();
