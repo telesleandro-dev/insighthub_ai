@@ -119,26 +119,64 @@ export async function POST(req: Request) {
         }
 
 
-        // 7. UPSERT DO PRODUTO
-        const { data: productRecord, error: prodError } = await supabase
+        // 7. BUSCAR OU CRIAR PRODUTO
+        let productRecord: any = null;
+
+        // 7.1. Primeiro, tentar encontrar produto existente por external_id
+        const { data: existingProduct } = await supabase
             .from('products')
-            .upsert({
-                external_id: normalizedData.productId,
-                name: normalizedData.productName,
-                user_id: userConfig.user_id,
-                platform: adapter.name
-            }, { onConflict: 'external_id, user_id' })
-            .select()
+            .select('*')
+            .eq('external_id', normalizedData.productId)
+            .eq('user_id', userConfig.user_id)
             .single();
 
-        if (prodError) {
-            console.error('[Webhook] Erro ao criar/atualizar produto:', prodError.message);
-            throw prodError;
+        if (existingProduct) {
+            productRecord = existingProduct;
+            console.log('[Webhook] Produto encontrado por external_id:', productRecord.id);
+        } else {
+            // 7.2. Se não encontrou, buscar por nome similar (case-insensitive)
+            const { data: productsByName } = await supabase
+                .from('products')
+                .select('*')
+                .eq('user_id', userConfig.user_id)
+                .ilike('name', `%${normalizedData.productName}%`);
+
+            if (productsByName && productsByName.length > 0) {
+                // Usar o primeiro produto encontrado com nome similar
+                productRecord = productsByName[0];
+                console.log('[Webhook] Produto encontrado por nome similar:', productRecord.id, productRecord.name);
+
+                // Atualizar external_id do produto para sincronizar
+                await supabase
+                    .from('products')
+                    .update({ external_id: normalizedData.productId })
+                    .eq('id', productRecord.id);
+
+                console.log('[Webhook] External_id atualizado para sincronizar');
+            } else {
+                // 7.3. Se não encontrou nenhum, criar novo produto
+                const { data: newProduct, error: prodError } = await supabase
+                    .from('products')
+                    .insert({
+                        external_id: normalizedData.productId,
+                        name: normalizedData.productName,
+                        user_id: userConfig.user_id,
+                        platform: adapter.name
+                    })
+                    .select()
+                    .single();
+
+                if (prodError) {
+                    console.error('[Webhook] Erro ao criar produto:', prodError.message);
+                    throw prodError;
+                }
+
+                productRecord = newProduct;
+                console.log('[Webhook] Novo produto criado:', productRecord.id);
+            }
         }
 
-        console.log('[Webhook] Produto registrado:', productRecord.id);
-
-        // 7.1. BUSCAR PREÇO DO PRODUTO SE AMOUNT = 0 (carrinho abandonado)
+        // 7.4. BUSCAR PREÇO DO PRODUTO SE AMOUNT = 0 (carrinho abandonado)
         let finalAmount = normalizedData.amount;
         if (finalAmount === 0 && productRecord.price) {
             console.log('[Webhook] Amount = 0, usando preço do produto:', productRecord.price);
