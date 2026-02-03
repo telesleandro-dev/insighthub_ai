@@ -49,6 +49,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           value,
           created_at,
           platform_origin,
+          recovery_status,
           products!sales_events_product_id_fkey (
             name
           )
@@ -94,13 +95,17 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     const aprovadas = filtered.filter(e => e.status === 'paid');
     const recuperadas = filtered.filter(e => e.status_abordagem === 'recuperado');
 
-    // Pipeline: Tudo que não foi pago e não foi perdido/recuperado, OU seja, o que está na mesa
+    // Pipeline: Só leads RECUPERÁVEIS (recovery_status = 'eligible')
     const pipeline = filtered.filter(e =>
-      e.status !== 'paid' &&
+      e.recovery_status === 'eligible' &&  // ⬅️ NOVO!
       (['pendente', 'contatado', 'em_negociacao'].includes(e.status_abordagem || 'pendente'))
     );
 
-    const pendingLeads = filtered.filter(e => (e.status_abordagem || 'pendente') === 'pendente' && e.status !== 'paid');
+    // Leads pendentes: Só os RECUPERÁVEIS (recovery_status = 'eligible')
+    const pendingLeads = filtered.filter(e =>
+      e.recovery_status === 'eligible' &&  // ⬅️ NOVO!
+      (e.status_abordagem || 'pendente') === 'pendente'
+    );
 
     const faturamentoTotal = aprovadas.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
     const valorRecuperado = recuperadas.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
