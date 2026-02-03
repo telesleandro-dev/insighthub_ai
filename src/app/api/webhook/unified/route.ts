@@ -118,6 +118,7 @@ export async function POST(req: Request) {
             throw error;
         }
 
+
         // 7. UPSERT DO PRODUTO
         const { data: productRecord, error: prodError } = await supabase
             .from('products')
@@ -137,6 +138,13 @@ export async function POST(req: Request) {
 
         console.log('[Webhook] Produto registrado:', productRecord.id);
 
+        // 7.1. BUSCAR PREÇO DO PRODUTO SE AMOUNT = 0 (carrinho abandonado)
+        let finalAmount = normalizedData.amount;
+        if (finalAmount === 0 && productRecord.price) {
+            console.log('[Webhook] Amount = 0, usando preço do produto:', productRecord.price);
+            finalAmount = productRecord.price;
+        }
+
         // 8. REGISTRAR EVENTO DE VENDA
         const { error: dbError } = await supabase.from('sales_events').insert({
             user_id: userConfig.user_id,
@@ -145,7 +153,7 @@ export async function POST(req: Request) {
             customer_email: normalizedData.customerEmail,
             customer_phone: normalizedData.customerPhone || '',
             status: normalizedData.status,
-            value: normalizedData.amount,
+            value: finalAmount,
             platform_origin: adapter.name,
             external_transaction_id: normalizedData.transactionId,
             platform_metadata: normalizedData.metadata || {},
@@ -158,6 +166,7 @@ export async function POST(req: Request) {
         }
 
         console.log('[Webhook] Venda registrada com sucesso');
+
 
         // 9. ENVIAR NOTIFICAÇÃO TELEGRAM
         if (userConfig.telegram_token && userConfig.telegram_chat_id) {

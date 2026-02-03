@@ -114,6 +114,13 @@ export async function POST(req: Request) {
 
     console.log('✅ Produto salvo/atualizado:', productRecord);
 
+    // 5.1. BUSCAR PREÇO DO PRODUTO SE AMOUNT = 0 (carrinho abandonado)
+    let finalAmount = customerData.amount;
+    if (finalAmount === 0 && productRecord.price) {
+      console.log('💰 Amount = 0, usando preço do produto cadastrado:', productRecord.price);
+      finalAmount = productRecord.price;
+    }
+
     // 6. REGISTRO DA VENDA
     console.log('💾 Registrando venda...');
     const { error: dbError } = await supabase.from('sales_events').insert({
@@ -123,7 +130,7 @@ export async function POST(req: Request) {
       customer_email: customerData.email,
       customer_phone: customerData.mobile,
       status: customerData.status,
-      value: customerData.amount,
+      value: finalAmount,
       platform_origin: 'kiwify'
     });
 
