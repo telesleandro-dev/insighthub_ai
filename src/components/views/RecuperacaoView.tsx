@@ -114,7 +114,7 @@ export default function RecuperacaoView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId: lead.id,
-          productName: lead.product_name || 'nosso produto',
+          productName: lead.products?.name || 'nosso produto',
           customerName: lead.customer_name
         })
       });
@@ -329,12 +329,12 @@ export default function RecuperacaoView() {
 
                 <td className="px-6 py-4">
                   <span className="text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                    {lead.product_name || 'Produto não identificado'}
+                    {lead.products?.name || 'Produto não identificado'}
                   </span>
                 </td>
 
                 <td className="px-6 py-4 font-black text-slate-700">
-                  {Number(lead.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {Number(lead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </td>
 
                 <td className="px-6 py-4">
