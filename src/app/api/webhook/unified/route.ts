@@ -25,6 +25,68 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
 /**
+ * Determina o status de recuperação baseado no status da plataforma
+ */
+function determineRecoveryStatus(platformStatus: string, paymentMethod?: string): string {
+    const statusLower = platformStatus.toLowerCase();
+
+    // Leads IMEDIATAMENTE recuperáveis
+    if (['abandoned', 'refused', 'rejected', 'expired', 'refunded', 'chargeback'].includes(statusLower)) {
+        return 'eligible';
+    }
+
+    // Leads em ESPERA (PIX gerado, aguardando pagamento)
+    if (['waiting_payment', 'pending'].includes(statusLower)) {
+        return 'pending';
+    }
+
+    // Convertidos (pagos)
+    if (['paid', 'approved', 'complete'].includes(statusLower)) {
+        return 'converted';
+    }
+
+    // Padrão: aguardando (mais seguro que marcar como eligible)
+    return 'pending';
+}
+
+/**
+ * Auto-limpeza: Remove/atualiza eventos anteriores quando lead pagar
+ */
+async function cleanupPreviousEvents(
+    userId: string,
+    customerEmail: string,
+    productId: string
+): Promise<void> {
+    try {
+        const { data: previousEvents } = await supabase
+            .from('sales_events')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('customer_email', customerEmail)
+            .eq('product_id', productId)
+            .in('recovery_status', ['eligible', 'pending'])
+            .order('created_at', { ascending: false });
+
+        if (previousEvents && previousEvents.length > 0) {
+            const ids = previousEvents.map(e => e.id);
+
+            await supabase
+                .from('sales_events')
+                .update({
+                    recovery_status: 'converted',
+                    converted_at: new Date().toISOString()
+                })
+                .in('id', ids);
+
+            console.log('🧹 [Auto-Limpeza] Convertidos', ids.length, 'eventos anteriores');
+        }
+    } catch (error: any) {
+        console.error('[Auto-Limpeza] Erro:', error.message);
+    }
+}
+
+
+/**
  * Handler POST para webhooks de todas as plataformas
  */
 export async function POST(req: Request) {
@@ -183,6 +245,22 @@ export async function POST(req: Request) {
             finalAmount = productRecord.price;
         }
 
+        // 7.5. DETERMINAR STATUS DE RECUPERAÇÃO
+        const recoveryStatus = determineRecoveryStatus(
+            normalizedData.status,
+            normalizedData.metadata?.payment_method
+        );
+        console.log('[Webhook] Recovery Status:', recoveryStatus);
+
+        // 7.6. AUTO-LIMPEZA: Se lead pagou, converter eventos anteriores
+        if (recoveryStatus === 'converted') {
+            await cleanupPreviousEvents(
+                userConfig.user_id,
+                normalizedData.customerEmail,
+                productRecord.id
+            );
+        }
+
         // 8. REGISTRAR EVENTO DE VENDA
         const { error: dbError } = await supabase.from('sales_events').insert({
             user_id: userConfig.user_id,
@@ -195,8 +273,12 @@ export async function POST(req: Request) {
             platform_origin: adapter.name,
             external_transaction_id: normalizedData.transactionId,
             platform_metadata: normalizedData.metadata || {},
-            status_abordagem: 'pendente'
+            status_abordagem: 'pendente',
+            recovery_status: recoveryStatus,  // ⬅️ NOVO!
+            payment_method: normalizedData.metadata?.payment_method || null,  // ⬅️ NOVO!
+            converted_at: recoveryStatus === 'converted' ? new Date().toISOString() : null  // ⬅️ NOVO!
         });
+
 
         if (dbError) {
             console.error('[Webhook] Erro ao registrar venda:', dbError.message);

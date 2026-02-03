@@ -156,11 +156,13 @@ export default function RecuperacaoView() {
       .select(`
       *,
       products (
-        name
+        name,
+        price
       )
-    `) // Adicionamos o join para o nome do produto não vir "Sem Nome"
-      .eq('user_id', user!.id) // Filtro de segurança (Pilar 3)
-      .neq('status', 'paid') // "neq" significa "não é igual a". Traz tudo que não é pago.
+    `)
+      .eq('user_id', user!.id) // Filtro de segurança
+      .eq('recovery_status', 'eligible') // ⬅️ NOVO: Só leads recuperáveis
+      .neq('status', 'paid')
       .order('created_at', { ascending: false });
 
     if (data) setLeads(data);
