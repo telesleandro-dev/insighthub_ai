@@ -194,17 +194,17 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     <div className="p-8 space-y-8 animate-in fade-in duration-500 font-sans">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Visão Geral & Ações</h2>
-          <p className="text-sm text-slate-500">Foque no que importa: <span className="font-bold text-emerald-600">Recupere suas vendas agora.</span></p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Visão Geral & Ações</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Foque no que importa: <span className="font-bold text-emerald-600 dark:text-emerald-400">Recupere suas vendas agora.</span></p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl border">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-transparent dark:border-slate-700">
             {['today', '7days', '30days'].map((t) => (
               <button
                 key={t}
                 onClick={() => handleFilters(platformFilter, t)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${timeRange === t ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${timeRange === t ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
               >
                 {t === 'today' ? 'Hoje' : t === '7days' ? '7 Dias' : '30 Dias'}
               </button>
@@ -214,7 +214,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           <select
             value={platformFilter}
             onChange={(e) => handleFilters(e.target.value, timeRange)}
-            className="bg-white border p-2 rounded-xl text-xs font-bold text-slate-600 outline-none shadow-sm capitalize"
+            className="bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none shadow-sm capitalize"
           >
             <option value="all">Todas Plataformas</option>
             {availablePlatforms.map(plat => (
@@ -290,40 +290,40 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* --- BLOCO SECUNDÁRIO: CONTEXTO E OPERACIONAL --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* PRODUTO CAMPEÃO COM FOCO OPERACIONAL */}
-        <div className="col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="col-span-2 bg-white dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
               <TrendingUp size={14} /> Prioridade Operacional
             </p>
-            <h4 className="text-lg font-black text-slate-800">{metrics.topProduct}</h4>
-            <p className="text-slate-500 text-xs mt-1">Este é o produto com maior volume de oportunidades no período. Priorize a recuperação dele.</p>
+            <h4 className="text-lg font-black text-slate-800 dark:text-white">{metrics.topProduct}</h4>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">Este é o produto com maior volume de oportunidades no período. Priorize a recuperação dele.</p>
           </div>
-          <div className="hidden md:block bg-blue-50 p-3 rounded-full">
-            <Rocket className="text-blue-600" size={24} />
+          <div className="hidden md:block bg-blue-50 dark:bg-slate-800 p-3 rounded-full">
+            <Rocket className="text-blue-600 dark:text-blue-400" size={24} />
           </div>
         </div>
 
         {/* KPI SECUNDÁRIO */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 opacity-50">
+        <div className="bg-white dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-3 mb-2 opacity-50 dark:opacity-70 dark:text-slate-300">
             <Target size={16} />
             <p className="text-[10px] font-bold uppercase tracking-widest">Conversão Geral</p>
           </div>
-          <h3 className="text-2xl font-black text-slate-700">{metrics.taxaConversao.toFixed(1)}%</h3>
+          <h3 className="text-2xl font-black text-slate-700 dark:text-slate-200">{metrics.taxaConversao.toFixed(1)}%</h3>
           <p className="text-[10px] text-slate-400 mt-1">Métrica apenas informativa.</p>
         </div>
       </div>
 
       {/* --- GRÁFICO HISTÓRICO (ECHARTS) --- */}
-      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-white dark:bg-slate-900/50 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-end mb-6">
           <div>
-            <h3 className="font-bold text-slate-800 uppercase text-[10px] tracking-widest">Histórico de Faturamento</h3>
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 uppercase text-[10px] tracking-widest">Histórico de Faturamento</h3>
             <p className="text-xs text-slate-400 mt-1">Acompanhamento diário para contexto.</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-slate-400 font-bold uppercase">Total Recuperado</p>
-            <p className="text-xl font-black text-slate-900">{metrics.recuperado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-xl font-black text-slate-900 dark:text-white">{metrics.recuperado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
         </div>
 

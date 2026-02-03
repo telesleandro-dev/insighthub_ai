@@ -1,0 +1,21 @@
+{
+    "user_id": "c048be53-fff6-4446-a8b8-6abf79fce171",
+    "sender": "joao.silva@gmail.com",
+    "sender_name": "João Silva",
+    "to": "insight@insighthubai.com",
+    "subject": "Dúvida sobre a Bíblia Negra da Sedução",
+    "body": "Olá! Vi o anúncio da Bíblia Negra da Sedução e fiquei muito interessado. Gostaria de saber se o conteúdo realmente funciona para melhorar habilidades sociais e conquistar pessoas. O preço está um pouco alto, vocês têm alguma garantia ou período de teste? Também queria saber se tem suporte após a compra. Estou com receio de comprar e não conseguir aplicar as técnicas. Aguardo retorno!",
+    "received_at": "2026-02-03T14:30:00.000Z",
+    "message_id": "msg_biblia_negra_test_001",
+    "analise_sentimento": "Neutro",
+    "intencao": "Dúvida sobre produto",
+    "resumo_executivo": "Lead interessado na Bíblia Negra da Sedução mas com objeções sobre preço e eficácia. Busca garantias e suporte.",
+    "dores_identificadas": [
+        "Receio de não saber aplicar as técnicas",
+        "Preço alto",
+        "Falta de confiança no produto"
+    ],
+    "probabilidade_conversao": 65,
+    "sugestao_resposta": "Olá João! Que ótimo que você se interessou pela Bíblia Negra da Sedução! Sim, o método funciona e temos milhares de alunos com resultados comprovados. Oferecemos garantia de 7 dias - se você não gostar, devolvemos 100% do seu dinheiro. Além disso, você terá acesso ao nosso grupo de suporte exclusivo com mentores para tirar dúvidas. As técnicas são explicadas passo a passo, bem práticas e fáceis de aplicar no dia a dia. Posso te enviar alguns depoimentos de alunos que estavam na mesma situação que você?",
+    "produto_identificado": "Bíblia Negra da Sedução"
+}

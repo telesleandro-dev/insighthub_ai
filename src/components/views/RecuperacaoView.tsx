@@ -178,7 +178,7 @@ export default function RecuperacaoView() {
   return (
     <div className="p-8 space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Recuperação de Vendas</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Recuperação de Vendas</h2>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* NOVO: Filtro de Status de Abordagem */}
@@ -187,7 +187,7 @@ export default function RecuperacaoView() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
+              className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
             >
               <option value="all">Todos os Status</option>
               <option value="pendente">Pendentes</option>
@@ -202,7 +202,7 @@ export default function RecuperacaoView() {
             <select
               value={platformFilter}
               onChange={(e) => setPlatformFilter(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
+              className="pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm appearance-none cursor-pointer"
             >
               <option value="all">Todas as Plataformas</option>
               {plataformasDisponiveis.map(p => (
@@ -211,7 +211,7 @@ export default function RecuperacaoView() {
             </select>
           </div>
 
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             {[
               { id: 'all', label: 'Todos' },
               { id: 'high_value', label: 'Tickets R$ 500+' },

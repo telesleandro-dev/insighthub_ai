@@ -2,14 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Brain, RefreshCcw, Settings, Rocket, LogOut, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Brain, RefreshCcw, Settings, Rocket, LogOut, ShieldAlert, Package } from "lucide-react";
 import DashboardView from "@/components/views/DashboardView";
 import RecuperacaoView from "@/components/views/RecuperacaoView";
 import InteligenciaView from "@/components/views/InteligenciaView";
 import ConfiguracoesView from "@/components/views/ConfiguracoesView";
 import AdminUsersView from "@/components/views/AdminUsersView";
+import ProdutosView from "@/components/views/ProdutosView";
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,6 +24,7 @@ export default function DashboardPage() {
       { id: 'dashboard', label: 'Dashboard Geral', icon: <LayoutDashboard size={18} />, category: 'Monitoramento' },
       { id: 'inteligencia', label: 'Inteligência de Produto', icon: <Brain size={18} />, category: 'Monitoramento' },
       { id: 'recuperacao', label: 'Recuperação de Vendas', icon: <RefreshCcw size={18} />, category: 'Monitoramento' },
+      { id: 'produtos', label: 'Produtos', icon: <Package size={18} />, category: 'Gerenciar' },
       { id: 'config', label: 'Configurações', icon: <Settings size={18} />, category: 'Sistema' },
     ];
 
@@ -51,7 +54,7 @@ export default function DashboardPage() {
         </div>
 
         <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
-          {['Monitoramento', 'Sistema'].map((cat) => (
+          {['Monitoramento', 'Gerenciar', 'Sistema'].map((cat) => (
             <div key={cat}>
               <p className="text-[10px] uppercase text-slate-500 font-bold mb-4 px-3 tracking-widest">{cat}</p>
               <div className="space-y-1">
@@ -87,6 +90,11 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          <div className="mb-4">
+            <ThemeToggle />
+          </div>
+
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-red-500/10 rounded-xl transition-all"
@@ -97,10 +105,11 @@ export default function DashboardPage() {
       </aside>
 
       {/* CONTEÚDO CENTRAL */}
-      <main className="flex-1 overflow-y-auto bg-[#f8f9fc]">
+      <main className="flex-1 overflow-y-auto bg-[#f8f9fc] dark:bg-slate-950 transition-colors duration-300">
         {activeSection === 'dashboard' && <DashboardView onNavigate={setActiveSection} />}
         {activeSection === 'recuperacao' && <RecuperacaoView />}
         {activeSection === 'inteligencia' && <InteligenciaView />}
+        {activeSection === 'produtos' && <ProdutosView />}
         {activeSection === 'config' && <ConfiguracoesView />}
         {activeSection === 'admin' && <AdminUsersView />}
       </main>

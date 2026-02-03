@@ -1,0 +1,16 @@
+{
+    "type": "email.received",
+    "created_at": "2026-02-03T15:50:00.000Z",
+    "data": {
+        "to": [
+            "leandro.teles@insighthubai.com"
+        ],
+        "from": "maria.oliveira@hotmail.com",
+        "subject": "Problema com o curso Bíblia Negra",
+        "html": "<p>Boa tarde,</p><p>Gostaria de expressar minha insatisfação com o curso <strong>Bíblia Negra da Sedução</strong>.</p><p>Os seguintes problemas foram identificados:</p><ul><li>Conteúdo não atende às expectativas criadas pela propaganda</li><li>Suporte inexistente - ninguém responde minhas dúvidas</li><li>Preço muito alto para o que oferece</li><li>Técnicas desatualizadas e genéricas</li></ul><p>Espero uma posição da empresa sobre isso.</p><p>Atenciosamente,<br>Maria Oliveira</p>",
+        "text": "Gostaria de expressar minha insatisfação com o curso Bíblia Negra da Sedução. Conteúdo não atende às expectativas criadas pela propaganda. Suporte inexistente - ninguém responde minhas dúvidas. Preço muito alto para o que oferece. Técnicas desatualizadas e genéricas. Espero uma posição da empresa sobre isso.",
+        "reply_to": "maria.oliveira@hotmail.com",
+        "message_id": "<MW3PR84MB1234ABC567@outlook.com>",
+        "date": "2026-02-03T15:50:00.000Z"
+    }
+}

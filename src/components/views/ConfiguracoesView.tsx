@@ -148,14 +148,14 @@ export default function ConfiguracoesView() {
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white px-6 py-4 rounded-xl border border-slate-200 shadow-sm">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 px-6 py-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="bg-blue-600 p-2.5 rounded-lg shadow-blue-200 shadow-lg">
+            <div className="bg-blue-600 p-2.5 rounded-lg shadow-blue-200 dark:shadow-blue-900/20 shadow-lg">
               <LayoutDashboard className="text-white" size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Configurações</h2>
-              <p className="text-xs text-slate-500 font-medium">Gerencie suas integrações e preferências da IA.</p>
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Configurações</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Gerencie suas integrações e preferências da IA.</p>
             </div>
           </div>
           <button
@@ -175,23 +175,23 @@ export default function ConfiguracoesView() {
           <div className="lg:col-span-8 space-y-6">
 
             {/* CARD 1: CANAIS DE ENTRADA (Tabs) */}
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Zap className="text-amber-500" size={18} />
-                  <h3 className="font-bold text-slate-800 text-sm">Canais de Entrada de Dados</h3>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm">Canais de Entrada de Dados</h3>
                 </div>
                 {/* Tabs Switcher */}
-                <div className="flex bg-slate-200/50 p-1 rounded-lg self-start">
+                <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg self-start">
                   <button
                     onClick={() => setActiveTab('webhook')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'webhook' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'webhook' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                   >
                     Webhook
                   </button>
                   <button
                     onClick={() => setActiveTab('email')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'email' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                   >
                     E-mail
                   </button>
@@ -209,10 +209,10 @@ export default function ConfiguracoesView() {
                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Ativo
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 group hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
                       <Globe className="text-slate-400" size={16} />
-                      <code className="text-[11px] text-slate-600 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
-                      <button onClick={() => copyToClipboard(webhookUrl)} className="p-2 bg-white rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition-all shadow-sm">
+                      <code className="text-[11px] text-slate-600 dark:text-slate-300 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
+                      <button onClick={() => copyToClipboard(webhookUrl)} className="p-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm">
                         {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                       </button>
                     </div>
@@ -231,11 +231,12 @@ export default function ConfiguracoesView() {
                     <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 group hover:border-blue-200 transition-colors">
                       <Mail className="text-slate-400" size={16} />
                       <code className="text-[11px] text-slate-600 flex-1 truncate font-mono font-bold select-all">
-                        insights+usuario_demo@insighthub.ai
+                        {profile?.insighthub_email || 'Carregando...'}
                       </code>
                       <button
-                        onClick={() => copyToClipboard("insights+usuario_demo@insighthub.ai")}
+                        onClick={() => copyToClipboard(profile?.insighthub_email || '')}
                         className="p-2 bg-white rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition-all shadow-sm"
+                        disabled={!profile?.insighthub_email}
                       >
                         {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                       </button>
@@ -250,16 +251,16 @@ export default function ConfiguracoesView() {
             </section>
 
             {/* CARD 2: CONECTORES DE API */}
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center gap-2">
                   <Key className="text-blue-600" size={18} />
                   <div>
-                    <h3 className="font-bold text-slate-800 text-sm">Chaves de API</h3>
+                    <h3 className="font-bold text-slate-800 dark:text-white text-sm">Chaves de API</h3>
                     <p className="text-[10px] text-slate-400 font-medium">Conecte suas contas para importar dados históricos.</p>
                   </div>
                 </div>
-                <button onClick={addKeyField} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors flex items-center gap-1">
+                <button onClick={addKeyField} className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors flex items-center gap-1">
                   <Plus size={12} /> Adicionar
                 </button>
               </div>
@@ -268,12 +269,12 @@ export default function ConfiguracoesView() {
                 {apiKeys.map((key, index) => {
                   const platformConfig = PLATFORM_OPTIONS.find(p => p.id === key.name) || PLATFORM_OPTIONS[0];
                   return (
-                    <div key={index} className="flex gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:shadow-sm">
+                    <div key={index} className="flex gap-3 items-start bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 transition-all hover:shadow-sm">
                       <div className="w-1/3 min-w-[120px]">
                         <label className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Plataforma</label>
                         <div className="relative">
                           <select
-                            className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                            className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
                             value={key.name}
                             onChange={(e) => updateKey(index, 'name', e.target.value)}
                           >
@@ -288,7 +289,7 @@ export default function ConfiguracoesView() {
                           <input
                             type={visibleKeys[index] ? "text" : "password"}
                             placeholder={platformConfig.placeholder}
-                            className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-[11px] font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-300"
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-[11px] font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             value={key.value}
                             onChange={(e) => updateKey(index, 'value', e.target.value)}
                           />

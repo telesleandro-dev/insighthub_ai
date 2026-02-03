@@ -1,0 +1,16 @@
+{
+    "type": "email.received",
+    "created_at": "2026-02-03T14:35:00.000Z",
+    "data": {
+        "to": [
+            "insight@insighthubai.com"
+        ],
+        "from": "rafel.bc@gmail.com",
+        "subject": "Crítica negativa",
+        "html": "<p>Olá! Vi o anúncio da <strong>Bíblia Negra da Sedução</strong> e fiquei muito irritado.</p><p>Gostaria de saber se o conteúdo realmente ensina as pessoas a agirem de maneira errada!</p><p>irei denunciar voces!!</p>",
+        "text": "Vocês deviam remover esse tipo de conteúdo, pois fomenta o odio e a falta de ética entre as pessoas!",
+        "reply_to": "rafel.bc@gmail.com",
+        "message_id": "<CABxYz8K5mQ2vR9pL3sW1hF@mail.gmail.com>",
+        "date": "2026-02-03T14:35:00.000Z"
+    }
+}

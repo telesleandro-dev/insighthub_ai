@@ -174,10 +174,10 @@ export default function AdminUsersView() {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                        <Shield className="text-blue-600" /> Gestão de Usuários
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                        <Shield className="text-blue-600 dark:text-blue-400" /> Gestão de Usuários
                     </h2>
-                    <p className="text-sm text-slate-500">Administre o acesso e permissões do InsightHub.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Administre o acesso e permissões do InsightHub.</p>
                 </div>
                 <button
                     onClick={() => setIsInviteOpen(true)}
@@ -188,15 +188,15 @@ export default function AdminUsersView() {
             </div>
 
             {/* Content */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 {/* Toolbar */}
-                <div className="p-4 border-b border-slate-100 flex gap-4">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
                             placeholder="Buscar por nome ou e-mail..."
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100 text-slate-900"
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50 text-slate-900 dark:text-white"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -206,16 +206,16 @@ export default function AdminUsersView() {
                 {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-100">
+                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuário</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Perfil</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Handle InsightHub</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Usuário</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Perfil</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Handle InsightHub</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-right"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                             {loading ? (
                                 <tr>
                                     <td colSpan={5} className="p-8 text-center text-slate-500">
@@ -233,12 +233,12 @@ export default function AdminUsersView() {
                                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
                                                     {user.name?.[0] || user.email?.[0]?.toUpperCase() || '?'}
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-slate-900">{user.name || 'Sem nome'}</p>
-                                                    <p className="text-xs text-slate-500">{user.email || '-'}</p>
+                                                    <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name || 'Sem nome'}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{user.email || '-'}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -251,7 +251,7 @@ export default function AdminUsersView() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <code className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200 font-mono">
+                                            <code className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 font-mono">
                                                 {user.insighthub_email || '-'}
                                             </code>
                                         </td>

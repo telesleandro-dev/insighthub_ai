@@ -1,0 +1,16 @@
+{
+    "type": "email.received",
+    "created_at": "2026-02-03T15:47:00.000Z",
+    "data": {
+        "to": [
+            "leandro.teles@insighthubai.com"
+        ],
+        "from": "cliente.insatisfeito@gmail.com",
+        "subject": "Muito decepcionado com a Bíblia Negra da Sedução",
+        "html": "<p>Olá,</p><p>Comprei a <strong>Bíblia Negra da Sedução</strong> há 3 semanas e estou extremamente <strong>decepcionado</strong>!</p><p>O conteúdo NÃO funciona como prometido. Tentei aplicar as técnicas e não tive NENHUM resultado. Além disso, o material é superficial e não vale o preço que paguei.</p><p>Vou solicitar meu dinheiro de volta e escrever uma avaliação negativa em todos os lugares possíveis. Não recomendo para ninguém!</p><p>Muito insatisfeito,<br>Carlos Mendes</p>",
+        "text": "Comprei a Bíblia Negra da Sedução há 3 semanas e estou extremamente decepcionado! O conteúdo NÃO funciona como prometido. Tentei aplicar as técnicas e não tive NENHUM resultado. Além disso, o material é superficial e não vale o preço que paguei. Vou solicitar meu dinheiro de volta e escrever uma avaliação negativa em todos os lugares possíveis. Não recomendo para ninguém!",
+        "reply_to": "cliente.insatisfeito@gmail.com",
+        "message_id": "<CABxYz9L6nR3qS2pM4tX5hG@mail.gmail.com>",
+        "date": "2026-02-03T15:47:00.000Z"
+    }
+}
