@@ -17,13 +17,17 @@ const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
 export async function POST(req: Request) {
   let body: any;
+  let userIdFromUrl: string | null = null;
 
   try {
     body = await req.json();
+    console.log('📦 Webhook Kiwify recebido:', JSON.stringify(body, null, 2));
 
     // 2. IDENTIFICAÇÃO DINÂMICA (A Solução Definitiva)
     const { searchParams } = new URL(req.url);
-    const userIdFromUrl = searchParams.get('user_id');
+    userIdFromUrl = searchParams.get('user_id');
+
+    console.log('🔑 user_id da URL:', userIdFromUrl);
 
     // Mantemos o log para auditoria caso precise debugar
     await supabase.from('webhooks_log').insert({
@@ -34,38 +38,39 @@ export async function POST(req: Request) {
     });
 
     if (!userIdFromUrl) {
+      console.error('❌ user_id ausente na URL');
       return NextResponse.json({ error: 'user_id ausente na URL' }, { status: 400 });
     }
 
-     
-// 3. BUSCA CONFIGURAÇÃO (Garantindo formato UUID)
-const targetId = userIdFromUrl?.trim();
 
-// Log para conferir no painel da Vercel se o ID está chegando limpo
-console.log("Buscando UUID no banco:", targetId);
+    // 3. BUSCA CONFIGURAÇÃO (Garantindo formato UUID)
+    const targetId = userIdFromUrl?.trim();
 
-const { data: userConfig, error: configError } = await supabase
-  .from('user_configs')
-  .select('user_id, telegram_token, telegram_chat_id')
-  .eq('user_id', targetId) 
-  .maybeSingle();
+    // Log para conferir no painel da Vercel se o ID está chegando limpo
+    console.log("🔍 Buscando UUID no banco:", targetId);
 
-if (configError) {
-  // Se houver erro de tipagem ou permissão, ele aparecerá aqui
-  console.error("Erro retornado pelo Supabase:", configError.message);
-  return NextResponse.json({ error: 'Erro no banco de dados', details: configError.message }, { status: 500 });
-}
+    const { data: userConfig, error: configError } = await supabase
+      .from('user_configs')
+      .select('user_id, telegram_token, telegram_chat_id')
+      .eq('user_id', targetId)
+      .maybeSingle();
 
-if (!userConfig) {
-  // Se não houver erro, mas não encontrar a linha
-  console.warn("Nenhum usuário encontrado com o UUID:", targetId);
-  return NextResponse.json({ error: 'Usuário não localizado' }, { status: 401 });
-}
+    if (configError) {
+      // Se houver erro de tipagem ou permissão, ele aparecerá aqui
+      console.error("❌ Erro retornado pelo Supabase:", configError.message);
+      return NextResponse.json({ error: 'Erro no banco de dados', details: configError.message }, { status: 500 });
+    }
+
+    if (!userConfig) {
+      // Se não houver erro, mas não encontrar a linha
+      console.warn("⚠️ Nenhum usuário encontrado com o UUID:", targetId);
+      return NextResponse.json({ error: 'Usuário não localizado' }, { status: 401 });
+    }
 
     // 4. NORMALIZAÇÃO DE DADOS
     const customer = body.Customer || body.customer || {};
     const productInfo = body.product || {};
-    
+
     const customerData = {
       name: customer.full_name || body.name || 'Cliente Sem Nome',
       email: customer.email || body.email,
@@ -76,23 +81,41 @@ if (!userConfig) {
       amount: (body.order_amount / 100) || body.amount || 0
     };
 
-    if (!customerData.email) throw new Error('E-mail do cliente ausente');
+    console.log('📊 Dados extraídos:', {
+      productName: customerData.productName,
+      externalProductId: customerData.externalProductId,
+      customerEmail: customerData.email,
+      status: customerData.status,
+      amount: customerData.amount
+    });
+
+    if (!customerData.email) {
+      console.error('❌ E-mail do cliente ausente');
+      throw new Error('E-mail do cliente ausente');
+    }
 
     // 5. UPSERT DO PRODUTO
+    console.log('💾 Fazendo upsert do produto...');
     const { data: productRecord, error: prodError } = await supabase
       .from('products')
-      .upsert({ 
+      .upsert({
         external_id: customerData.externalProductId,
-        name: customerData.productName, 
+        name: customerData.productName,
         user_id: userConfig.user_id,
-        platform: 'kiwify' 
+        platform: 'kiwify'
       }, { onConflict: 'external_id, user_id' })
       .select()
       .single();
 
-    if (prodError) throw prodError;
+    if (prodError) {
+      console.error('❌ Erro ao fazer upsert do produto:', prodError);
+      throw prodError;
+    }
+
+    console.log('✅ Produto salvo/atualizado:', productRecord);
 
     // 6. REGISTRO DA VENDA
+    console.log('💾 Registrando venda...');
     const { error: dbError } = await supabase.from('sales_events').insert({
       user_id: userConfig.user_id,
       product_id: productRecord.id,
@@ -104,33 +127,56 @@ if (!userConfig) {
       platform_origin: 'kiwify'
     });
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('❌ Erro ao registrar venda:', dbError);
+      throw dbError;
+    }
 
-    // 7. NOTIFICAÇÃO TELEGRAM
+    console.log('✅ Venda registrada com sucesso');
+
+    // 7. NOTIFICAÇÃO TELEGRAM (NÃO BLOQUEIA RESPOSTA)
     if (userConfig.telegram_token && userConfig.telegram_chat_id) {
+      console.log('📱 Tentando enviar notificação Telegram...');
+      try {
         const userBot = new TelegramBot(userConfig.telegram_token);
         const isAbandonment = !['paid', 'approved'].includes(customerData.status);
-        const msg = `🚀 *InsightHub AI*\n\n${isAbandonment ? '⚠️ *CARRINHO ABANDONADO*' : '✅ *VENDA APROVADA*'}\n👤 *Cliente:* ${customerData.name}\n💰 *Valor:* R$ ${customerData.amount.toFixed(2)}\n📦 *Produto:* ${customerData.productName}`;
+        const msg = `🚀 *InsightHub AI*\\n\\n${isAbandonment ? '⚠️ *CARRINHO ABANDONADO*' : '✅ *VENDA APROVADA*'}\\n👤 *Cliente:* ${customerData.name}\\n💰 *Valor:* R$ ${customerData.amount.toFixed(2)}\\n📦 *Produto:* ${customerData.productName}`;
 
         await userBot.sendMessage(userConfig.telegram_chat_id, msg, {
           parse_mode: 'Markdown',
           reply_markup: isAbandonment && customerData.mobile ? {
-            inline_keyboard: [[{ 
-              text: '📱 Recuperar no WhatsApp', 
-              url: `https://wa.me/55${customerData.mobile.replace(/\D/g, '')}` 
+            inline_keyboard: [[{
+              text: '📱 Recuperar no WhatsApp',
+              url: `https://wa.me/55${customerData.mobile.replace(/\D/g, '')}`
             }]]
           } : undefined
         });
+        console.log('✅ Telegram enviado');
+      } catch (telegramError: any) {
+        // NÃO FALHA o webhook se Telegram der erro
+        console.error('⚠️ Erro ao enviar Telegram (não crítico):', telegramError.message);
+      }
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    // RESPOSTA DE SUCESSO SEMPRE
+    console.log('✅ Webhook processado com sucesso');
+    return NextResponse.json({
+      success: true,
+      product: {
+        id: productRecord.id,
+        name: customerData.productName,
+        external_id: customerData.externalProductId
+      }
+    }, { status: 200 });
 
   } catch (error: any) {
+    console.error('❌ Erro fatal no webhook:', error.message);
     await supabase.from('webhooks_log').insert({
       platform: 'kiwify',
       payload: body || {},
       status: 'error',
-      error_message: error.message
+      error_message: error.message,
+      user_id: userIdFromUrl
     });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

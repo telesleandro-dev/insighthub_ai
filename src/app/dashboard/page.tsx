@@ -10,6 +10,7 @@ import ConfiguracoesView from "@/components/views/ConfiguracoesView";
 import AdminUsersView from "@/components/views/AdminUsersView";
 import ProdutosView from "@/components/views/ProdutosView";
 import { useAuth } from '@/hooks/useAuth';
+import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { supabase } from '@/lib/supabase';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -17,6 +18,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
+
+  // Auto-logout após 60 minutos de inatividade
+  useIdleTimer({ timeoutMinutes: 60 });
 
   // Definimos os itens do menu dinamicamente com useMemo
   const menuItems = useMemo(() => {
