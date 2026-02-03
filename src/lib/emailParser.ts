@@ -41,18 +41,18 @@ export function parseEmail(rawEmail: any): ParsedEmail {
 function htmlToText(html: string): string {
     if (!html) return '';
 
+    // Remove tags HTML e retorna texto limpo
     return html
-        .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove style tags
-        .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove script tags
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
         .replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newline
         .replace(/<\/p>/gi, '\n\n') // Convert closing </p> to double newline
-        .replace(/<[^>]+>/g, ' ') // Remove all other HTML tags
+        .replace(/<[^>]+>/g, '') // Remove all other HTML tags
         .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
         .replace(/&amp;/g, '&') // Replace &amp; with &
         .replace(/&lt;/g, '<') // Replace &lt; with <
         .replace(/&gt;/g, '>') // Replace &gt; with >
         .replace(/&quot;/g, '"') // Replace &quot; with "
-        .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
 }
 
