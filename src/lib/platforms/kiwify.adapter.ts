@@ -120,7 +120,7 @@ export class KiwifyAdapter implements PlatformAdapter {
             'complete': 'paid',
             'waiting_payment': 'waiting_payment',
             'pending': 'waiting_payment',
-            'abandoned': 'waiting_payment',
+            'abandoned': 'abandoned',  // ⬅️ MANTÉM como abandoned (não converte)
             'refused': 'refused',
             'cancelled': 'refused',
             'refunded': 'refunded',

@@ -8,7 +8,7 @@
 /**
  * Status normalizado de uma venda/transação
  */
-export type SaleStatus = 'paid' | 'waiting_payment' | 'refused' | 'refunded' | 'chargeback';
+export type SaleStatus = 'paid' | 'waiting_payment' | 'refused' | 'refunded' | 'chargeback' | 'abandoned';
 
 /**
  * Dados normalizados de uma venda
@@ -17,28 +17,28 @@ export type SaleStatus = 'paid' | 'waiting_payment' | 'refused' | 'refunded' | '
 export interface NormalizedSaleData {
   /** Nome completo do cliente */
   customerName: string;
-  
+
   /** Email do cliente (obrigatório) */
   customerEmail: string;
-  
+
   /** Telefone do cliente (opcional, usado para recuperação) */
   customerPhone?: string;
-  
+
   /** Nome do produto vendido */
   productName: string;
-  
+
   /** ID externo do produto na plataforma */
   productId: string;
-  
+
   /** Valor da venda em reais (já convertido de centavos se necessário) */
   amount: number;
-  
+
   /** Status normalizado da transação */
   status: SaleStatus;
-  
+
   /** ID da transação na plataforma */
   transactionId: string;
-  
+
   /** Metadados específicos da plataforma (armazenados como JSON) */
   metadata?: Record<string, any>;
 }
@@ -49,17 +49,17 @@ export interface NormalizedSaleData {
 export interface PlatformAdapter {
   /** Nome único da plataforma (lowercase, sem espaços) */
   readonly name: string;
-  
+
   /** Nome de exibição da plataforma */
   readonly displayName: string;
-  
+
   /**
    * Detecta se o payload pertence a esta plataforma
    * @param payload Dados brutos recebidos do webhook
    * @returns true se o payload for desta plataforma
    */
   detectPayload(payload: any): boolean;
-  
+
   /**
    * Normaliza os dados do webhook para o formato padrão
    * @param payload Dados brutos recebidos do webhook
@@ -67,7 +67,7 @@ export interface PlatformAdapter {
    * @throws Error se dados obrigatórios estiverem ausentes
    */
   normalizeData(payload: any): NormalizedSaleData;
-  
+
   /**
    * Valida a assinatura do webhook (se a plataforma suportar)
    * @param payload Dados recebidos
@@ -76,7 +76,7 @@ export interface PlatformAdapter {
    * @returns true se a assinatura for válida
    */
   validateSignature?(payload: any, signature: string, secret: string): boolean;
-  
+
   /**
    * Retorna os headers esperados para validação
    */
