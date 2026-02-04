@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getKnowledgeContext } from '@/lib/knowledge/knowledgeContext';
 
 export async function POST(req: Request) {
   // Variáveis declaradas fora do try para estarem acessíveis no catch como fallback
@@ -37,7 +38,20 @@ export async function POST(req: Request) {
 
     const tomDeVoz = configData?.ai_tone || 'consultivo';
 
-    // 3. Inicializa Gemini SDK
+    // 3. Buscar contexto da Base de Conhecimento (não crítico - não deve quebrar se falhar)
+    let knowledgeContext = '';
+    let hasKnowledge = false;
+
+    try {
+      knowledgeContext = await getKnowledgeContext(lead.user_id, lead.product_id);
+      hasKnowledge = knowledgeContext.trim().length > 0;
+      console.log(`📚 [Recuperar] Conhecimento: ${hasKnowledge ? `${knowledgeContext.length} chars` : 'vazio'}`);
+    } catch (knowledgeError: any) {
+      console.warn('⚠️ [Recuperar] Erro ao buscar conhecimento (continuando sem ele):', knowledgeError.message);
+      // Continue sem conhecimento - não é crítico
+    }
+
+    // 4. Inicializa Gemini SDK
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error('❌ [Bruna IA] GEMINI_API_KEY não configurada.');
@@ -46,28 +60,35 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // 4. Prompt estruturado
+    // 5. Prompt estruturado com contexto da Base de Conhecimento
     const prompt = `
-      Persona: Você é a Bruna, uma assistente de vendas empática e persuasiva do InsightHub AI.
+      Persona: Você é uma assistente de vendas empática e persuasiva do InsightHub AI.
       Objetivo: Recuperar um cliente que abandonou o carrinho do produto "${nomeProduto}".
       Cliente: ${lead.customer_name}
       Tom de Voz: ${tomDeVoz.toUpperCase()}
       Link de Compra: ${linkFinal}
 
+      ${hasKnowledge ? `
+BASE DE CONHECIMENTO DO PRODUTO:
+${knowledgeContext}
+
+Use as informações acima para personalizar a mensagem e responder possíveis dúvidas sobre o produto.
+` : ''}
       Instruções:
       - Respeite o tom ${tomDeVoz.toUpperCase()} (Persuasivo = Urgência/Escassez | Consultivo = Ajudar com Dúvidas | Cordial = Gentileza).
       - Texto curto para WhatsApp (máximo 300 caracteres).
       - Use emojis de forma moderada e profissional.
       - Inclua o link ${linkFinal} obrigatoriamente.
-      - Não use aspas ou prefixos como "Bruna:".
+      - Não use aspas ou prefixos.
+      ${hasKnowledge ? '- Mencione um benefício específico do produto baseado na Base de Conhecimento.' : ''}
     `;
 
-    // Lista de modelos para tentativa (Fallback em Cascata para evitar 429)
+    // Lista de modelos válidos (obtidos da API Gemini v1beta)
     const modelsToTry = [
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-lite-preview-02-05",
-      "gemini-1.5-pro",
-      "gemini-1.5-flash-latest"
+      "gemini-2.5-flash",       // Mais rápido e moderno (June 2025)
+      "gemini-flash-latest",    // Sempre atualizado automaticamente
+      "gemini-2.0-flash",       // Estável e confiável
+      "gemini-pro-latest"       // Mais capaz, sempre atualizado
     ];
 
     let text: string | null = null;

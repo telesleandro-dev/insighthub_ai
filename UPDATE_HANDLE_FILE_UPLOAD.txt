@@ -1,0 +1,70 @@
+// ============================================================================
+// ATUALIZAÇÃO DO handleFileUpload - ConfiguracoesView.tsx
+// SUBSTITUIR LINHAS 168-214
+// ============================================================================
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      // Upload para Storage
+      const timestamp = Date.now();
+      const filePath = `knowledge/${user.id}/${timestamp}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge-base')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Salvar no banco
+      const { data: insertedFile, error: dbError } = await supabase
+        .from('knowledge_files')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          file_type: file.type
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      alert('✅ Arquivo enviado! Processando texto...');
+
+      // Processar extração de texto em background
+      fetch('/api/knowledge/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId: insertedFile.id,
+          userId: user.id
+        })
+      }).then(res => {
+        if (res.ok) {
+          console.log('✅ Texto extraído com sucesso');
+        } else {
+          console.error('❌ Erro na extração de texto');
+        }
+      });
+
+      // Recarregar lista
+      const { data } = await supabase
+        .from('knowledge_files')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (data) setKnowledgeFiles(data);
+
+    } catch (error: any) {
+      alert('❌ Erro: ' + error.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };

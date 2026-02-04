@@ -1,0 +1,103 @@
+// ============================================================================
+// Funções para Base de Conhecimento - Adicionar em ConfiguracoesView.tsx
+// ============================================================================
+
+// 1. ADICIONAR NO useEffect (após linha 98):
+useEffect(() => {
+  loadKnowledgeFiles();
+}, [user?.id]);
+
+// 2. SUBSTITUIR handleFileUpload (linhas 147-158) por:
+
+const loadKnowledgeFiles = async () => {
+  if (!user) return;
+  setLoadingFiles(true);
+  
+  const { data, error } = await supabase
+    .from('knowledge_files')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (!error && data) {
+    setKnowledgeFiles(data);
+  }
+  setLoadingFiles(false);
+};
+
+const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file || !user) return;
+  
+  setUploading(true);
+  try {
+    // 1. Upload para Storage
+    const timestamp = Date.now();
+    const filePath = `knowledge/${user.id}/${timestamp}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('knowledge-base')
+      .upload(filePath, file);
+    
+    if (uploadError) throw uploadError;
+
+    // 2. Salvar registro no banco
+    const { error: dbError } = await supabase
+      .from('knowledge_files')
+      .insert({
+        user_id: user.id,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        file_type: file.type
+      });
+
+    if (dbError) throw dbError;
+
+    alert('✅ Arquivo enviado!');
+    loadKnowledgeFiles();
+  } catch (error: any) {
+    alert('❌ Erro: ' + error.message);
+  } finally {
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+};
+
+const handleDeleteFile = async (file: any) => {
+  if (!confirm(`Deletar "${file.file_name}"?`)) return;
+
+  try {
+    const { error: storageError } = await supabase.storage
+      .from('knowledge-base')
+      .remove([file.file_path]);
+
+    if (storageError) throw storageError;
+
+    const { error: dbError } = await supabase
+      .from('knowledge_files')
+      .delete()
+      .eq('id', file.id);
+
+    if (dbError) throw dbError;
+
+    alert('✅ Deletado!');
+    loadKnowledgeFiles();
+  } catch (error: any) {
+    alert('❌ Erro: ' + error.message);
+  }
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short'
+  });
+};

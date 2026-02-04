@@ -78,7 +78,9 @@ export async function POST(req: Request) {
       productName: body.product_name || productInfo.product_name || 'Produto Desconhecido',
       externalProductId: String(body.product_id || productInfo.product_id || '000'),
       status: body.status || body.order_status || 'waiting_payment',
-      amount: (body.order_amount / 100) || body.amount || 0
+      amount: (body.order_amount / 100) || body.amount || 0,
+      externalTransactionId: body.order_id || body.transaction_id || body.id || null,
+      cpf: customer.cpf || body.cpf || null
     };
 
     console.log('📊 Dados extraídos:', {
@@ -86,7 +88,8 @@ export async function POST(req: Request) {
       externalProductId: customerData.externalProductId,
       customerEmail: customerData.email,
       status: customerData.status,
-      amount: customerData.amount
+      amount: customerData.amount,
+      externalTransactionId: customerData.externalTransactionId
     });
 
     if (!customerData.email) {
@@ -121,7 +124,48 @@ export async function POST(req: Request) {
       finalAmount = productRecord.price;
     }
 
-    // 6. REGISTRO DA VENDA
+    // 6. VERIFICAR DUPLICAÇÃO (idempotência)
+    console.log('🔍 Verificando duplicação...');
+
+    // Verificar por external_transaction_id se disponível
+    if (customerData.externalTransactionId) {
+      const { data: existingByTxId } = await supabase
+        .from('sales_events')
+        .select('id')
+        .eq('external_transaction_id', customerData.externalTransactionId)
+        .maybeSingle();
+
+      if (existingByTxId) {
+        console.log('⚠️ Venda já existe (transaction_id):', customerData.externalTransactionId);
+        return NextResponse.json({
+          success: true,
+          message: 'Webhook já processado (idempotente)',
+          sale_id: existingByTxId.id
+        }, { status: 200 });
+      }
+    }
+
+    // Verificar por email + minuto (fallback se não tiver transaction_id)
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: existingByEmail } = await supabase
+      .from('sales_events')
+      .select('id')
+      .eq('customer_email', customerData.email)
+      .eq('product_id', productRecord.id)
+      .eq('status', customerData.status)
+      .gte('created_at', oneMinuteAgo)
+      .maybeSingle();
+
+    if (existingByEmail) {
+      console.log('⚠️ Venda duplicada detectada (mesmo email/produto/status no último minuto)');
+      return NextResponse.json({
+        success: true,
+        message: 'Duplicate prevented',
+        sale_id: existingByEmail.id
+      }, { status: 200 });
+    }
+
+    // 7. REGISTRO DA VENDA
     console.log('💾 Registrando venda...');
     const { error: dbError } = await supabase.from('sales_events').insert({
       user_id: userConfig.user_id,
@@ -131,7 +175,14 @@ export async function POST(req: Request) {
       customer_phone: customerData.mobile,
       status: customerData.status,
       value: finalAmount,
-      platform_origin: 'kiwify'
+      platform_origin: 'kiwify',
+      external_transaction_id: customerData.externalTransactionId,
+      platform_metadata: {
+        cpf: customerData.cpf,
+        raw_status: body.status,
+        order_id: body.order_id,
+        checkout_link: body.checkout_link
+      }
     });
 
     if (dbError) {

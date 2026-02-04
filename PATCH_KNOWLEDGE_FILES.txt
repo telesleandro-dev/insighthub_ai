@@ -1,0 +1,183 @@
+// ============================================================================
+// PATCH COMPLETO - ConfiguracoesView.tsx
+// Copie e cole nas linhas indicadas
+// ============================================================================
+
+// ===========================================================================
+// 1. APÓS LINHA 100 (após }, [user?.id]);) - ADICIONAR:
+// ===========================================================================
+
+  // Carregar arquivos da base de conhecimento
+  useEffect(() => {
+    const loadFiles = async () => {
+      if (!user) return;
+      setLoadingFiles(true);
+      
+      const { data, error } = await supabase
+        .from('knowledge_files')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setKnowledgeFiles(data);
+      }
+      setLoadingFiles(false);
+    };
+
+    loadFiles();
+  }, [user?.id]);
+
+// ===========================================================================
+// 2. SUBSTITUIR handleFileUpload (LINHAS 147-158) POR:
+// ===========================================================================
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+    
+    setUploading(true);
+    try {
+      // Upload para Storage
+      const timestamp = Date.now();
+      const filePath = `knowledge/${user.id}/${timestamp}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge-base')
+        .upload(filePath, file);
+      
+      if (uploadError) throw uploadError;
+
+      // Salvar no banco
+      const { error: dbError } = await supabase
+        .from('knowledge_files')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          file_type: file.type
+        });
+
+      if (dbError) throw dbError;
+
+      alert('✅ Arquivo enviado com sucesso!');
+      
+      // Recarregar lista
+      const { data } = await supabase
+        .from('knowledge_files')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (data) setKnowledgeFiles(data);
+      
+    } catch (error: any) {
+      alert('❌ Erro: ' + error.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+// ===========================================================================
+// 3. ADICIONAR APÓS handleFileUpload:
+// ===========================================================================
+
+  const handleDeleteFile = async (file: any) => {
+    if (!confirm(`Deletar "${file.file_name}"?`)) return;
+
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('knowledge-base')
+        .remove([file.file_path]);
+
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('knowledge_files')
+        .delete()
+        .eq('id', file.id);
+
+      if (dbError) throw dbError;
+
+      alert('✅ Arquivo deletado!');
+      setKnowledgeFiles(knowledgeFiles.filter(f => f.id !== file.id));
+    } catch (error: any) {
+      alert('❌ Erro: ' + error.message);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short'
+    });
+  };
+
+// ===========================================================================
+// 4. LOCALIZAR "Base de Conhecimento Local" NA UI E ADICIONAR APÓS O BOTÃO:
+// (Procure por: <Database className="text-slate-600" size={24} />)
+// Adicione após o botão de upload:
+// ===========================================================================
+
+              {/* Lista de Arquivos */}
+              {knowledgeFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h5 className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                    <FileText size={14} />
+                    Arquivos Importados ({knowledgeFiles.length})
+                  </h5>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                    {knowledgeFiles.map((file) => (
+                      <div 
+                        key={file.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 group hover:border-purple-300 dark:hover:border-purple-600 transition-all"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+                            <FileText className="text-purple-600 dark:text-purple-400" size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                              {file.file_name}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {formatFileSize(file.file_size)} • {formatDate(file.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteFile(file)}
+                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Deletar arquivo"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loadingFiles && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="animate-spin text-purple-600" size={20} />
+                  <span className="ml-2 text-xs text-slate-500">Carregando arquivos...</span>
+                </div>
+              )}
+
+              {knowledgeFiles.length === 0 && !loadingFiles && (
+                <div className="mt-4 text-center py-6 bg-slate-50 dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                  <Database className="mx-auto text-slate-400 mb-2" size={24} />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum arquivo enviado ainda
+                  </p>
+                </div>
+              )}

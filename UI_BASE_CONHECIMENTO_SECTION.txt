@@ -1,0 +1,103 @@
+// ============================================================================
+// UI DA BASE DE CONHECIMENTO - ADICIONAR EM ConfiguracoesView.tsx
+// LOCALIZAÇÃO: Após a seção do Telegram (após linha 485)
+// ============================================================================
+
+            {/* CARD 6: BASE DE CONHECIMENTO */}
+            <section className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+                  <Database className="text-purple-600 dark:text-purple-400" size={16} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">Base de Conhecimento Local</h4>
+                  <p className="text-[9px] text-slate-400 font-medium">Envie arquivos para enriquecer as respostas da IA</p>
+                </div>
+              </div>
+
+              {/* Botão de Upload */}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  accept=".pdf,.txt,.doc,.docx"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-sm disabled:cursor-not-allowed"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <FileUp size={16} />
+                      Enviar Arquivo
+                    </>
+                  )}
+                </button>
+                <p className="text-[9px] text-slate-400 mt-2 text-center">
+                  Formatos aceitos: PDF, TXT, DOC, DOCX
+                </p>
+              </div>
+
+              {/* Lista de Arquivos */}
+              {knowledgeFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h5 className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                    <FileText size={14} />
+                    Arquivos Importados ({knowledgeFiles.length})
+                  </h5>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                    {knowledgeFiles.map((file) => (
+                      <div 
+                        key={file.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 group hover:border-purple-300 dark:hover:border-purple-600 transition-all"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+                            <FileText className="text-purple-600 dark:text-purple-400" size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                              {file.file_name}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {formatFileSize(file.file_size)} • {formatDate(file.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteFile(file)}
+                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Deletar arquivo"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loadingFiles && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="animate-spin text-purple-600" size={20} />
+                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">Carregando arquivos...</span>
+                </div>
+              )}
+
+              {knowledgeFiles.length === 0 && !loadingFiles && (
+                <div className="mt-4 text-center py-6 bg-slate-50 dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                  <Database className="mx-auto text-slate-400 mb-2" size={24} />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum arquivo enviado ainda
+                  </p>
+                </div>
+              )}
+            </section>

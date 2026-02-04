@@ -1,6 +1,13 @@
+/**
+ * API Endpoint: Email Inbound via CloudMailin
+ * 
+ * CloudMailin: https://www.cloudmailin.com/
+ * Recebe emails encaminhados e salva em inbox_messages
+ * Análise de IA feita automaticamente com Gemini
+ */
+
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { parseEmail } from '@/lib/emailParser';
 import { analyzeEmail } from '@/lib/ai/emailAnalyzer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,151 +20,205 @@ if (!supabaseUrl || !serviceRoleKey) {
 const supabase = createClient(supabaseUrl || '', serviceRoleKey || '');
 
 /**
- * Webhook endpoint for Resend Inbound Emails
- * https://resend.com/docs/dashboard/webhooks/event-types
+ * CloudMailin payload format (JSON)
+ * Docs: https://docs.cloudmailin.com/http_post_formats/json/
  */
+interface CloudMailinPayload {
+    envelope: {
+        from: string;
+        to: string[];
+        recipients: string[];
+    };
+    headers: {
+        Subject: string;
+        From: string;
+        To: string;
+        [key: string]: string;
+    };
+    plain?: string;
+    html?: string;
+}
+
 export async function POST(req: NextRequest) {
     try {
-        // Verify webhook signature (optional but recommended)
-        // const signature = req.headers.get('resend-signature');
-        // TODO: Implement signature verification
+        console.log('[Email Inbound CloudMailin] 📧 Webhook recebido');
 
-        const payload = await req.json();
-        console.log('Received inbound email:', payload);
+        const payload: CloudMailinPayload = await req.json();
 
-        // Resend sends email.received events
-        if (payload.type !== 'email.received') {
-            return NextResponse.json({ message: 'Event type not supported' }, { status: 200 });
-        }
+        const sender = payload.envelope.from;
+        const recipient = payload.envelope.to[0];
+        const subject = payload.headers.Subject || '(sem assunto)';
+        const bodyText = payload.plain || payload.html?.replace(/<[^>]*>/g, '') || '';
 
-        const emailData = payload.data;
-        const parsed = parseEmail(emailData);
+        console.log('[Email Inbound] From:', sender);
+        console.log('[Email Inbound] To:', recipient);
+        console.log('[Email Inbound] Subject:', subject);
 
-        // Extract recipient email to find user_id
-        const recipientEmail = emailData.to?.[0] || emailData.to;
-
-        if (!recipientEmail) {
-            console.error('No recipient email found');
-            return NextResponse.json({ error: 'No recipient' }, { status: 400 });
-        }
-
-        // Look up user by insighthub_email
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('insighthub_email', recipientEmail)
+        // 1. IDENTIFICAR USUÁRIO pelo email CloudMailin
+        const { data: emailConfig, error: configError } = await supabase
+            .from('user_email_configs')
+            .select('user_id, id')
+            .eq('forwarding_email', recipient)
+            .eq('is_active', true)
             .maybeSingle();
 
-        if (profileError || !profile) {
-            console.error('User not found for email:', recipientEmail, profileError);
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        if (configError || !emailConfig) {
+            console.error('[Email Inbound] ❌ Email config não encontrado:', recipient);
+            return NextResponse.json(
+                { error: 'Email configuration not found. Please configure in Settings.' },
+                { status: 404 }
+            );
         }
 
-        const userId = profile.id;
+        const userId = emailConfig.user_id;
+        console.log('[Email Inbound] ✅ User ID:', userId);
 
-        // Analyze email with AI
-        console.log('Analyzing email for user:', userId);
-        const analysis = await analyzeEmail(parsed.sender, parsed.subject, parsed.bodyText);
+        // 2. VERIFICAR DUPLICAÇÃO
+        const { data: existing } = await supabase
+            .from('inbox_messages')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('sender', sender)
+            .eq('subject', subject)
+            .gte('received_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+            .maybeSingle();
 
-        // DEBUG: Ver análise completa
-        console.log('📊 Análise completa da Gemini:', JSON.stringify(analysis, null, 2));
+        if (existing) {
+            console.log('[Email Inbound] ⚠️ Email duplicado ignorado');
+            return NextResponse.json({ success: true, message: 'Duplicate email ignored' });
+        }
 
-        // Try to match product by name (if produto_identificado exists)
+        // 3. ANALISAR EMAIL COM IA (Gemini)
+        console.log('[Email Inbound] 🤖 Iniciando análise com Gemini...');
+        const analysis = await analyzeEmail(sender, subject, bodyText);
+        console.log('[Email Inbound] ✅ Análise completa:', {
+            sentimento: analysis.analise_sentimento,
+            intencao: analysis.intencao,
+            conversao: analysis.probabilidade_conversao
+        });
+
+        // 4. VINCULAR PRODUTO AUTOMATICAMENTE (via email do remetente)
         let productId = null;
+
         if (analysis.produto_identificado) {
-            console.log('✅ Produto identificado pela IA:', analysis.produto_identificado);
+            console.log('[Email Inbound] 🎯 Produto identificado pela IA:', analysis.produto_identificado);
 
-            // Normalize the product name for better matching
-            const normalizedSearch = normalizeString(analysis.produto_identificado);
-            console.log('🔍 Buscando produto normalizado:', normalizedSearch);
-
-            // Get all products for this user
-            const { data: allProducts } = await supabase
+            // Buscar produtos do usuário
+            const { data: products } = await supabase
                 .from('products')
                 .select('id, name')
                 .eq('user_id', userId);
 
-            if (allProducts && allProducts.length > 0) {
-                console.log(`📦 ${allProducts.length} produto(s) cadastrado(s):`, allProducts.map(p => p.name));
+            if (products && products.length > 0) {
+                // Normalizar e buscar match
+                const normalizeString = (str: string) =>
+                    str.toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^\w\s]/g, '')
+                        .trim();
 
-                // Find best match by normalized similarity
-                let bestMatch = null;
-                for (const product of allProducts) {
-                    const normalizedProductName = normalizeString(product.name);
+                const searchTerm = normalizeString(analysis.produto_identificado);
 
-                    // Check if search term is contained in product name or vice-versa
-                    if (normalizedProductName.includes(normalizedSearch) ||
-                        normalizedSearch.includes(normalizedProductName)) {
-                        bestMatch = product;
+                for (const product of products) {
+                    const productName = normalizeString(product.name);
+                    if (productName.includes(searchTerm) || searchTerm.includes(productName)) {
+                        productId = product.id;
+                        console.log('[Email Inbound] ✅ Produto vinculado:', product.name);
                         break;
                     }
                 }
-
-                if (bestMatch) {
-                    productId = bestMatch.id;
-                    console.log('🎯 Product matched:', bestMatch.name, '→', productId);
-                } else {
-                    console.log('⚠️ Nenhum match encontrado. Tentei:', normalizedSearch);
-                }
-            } else {
-                console.log('⚠️ Nenhum produto cadastrado para este usuário');
             }
-        } else {
-            console.log('❌ Gemini NÃO retornou produto_identificado');
         }
 
-        // Helper function to normalize strings for matching
-        function normalizeString(str: string): string {
-            if (!str) return '';
+        // Se não identificou por nome, tenta por email em sales_events
+        if (!productId) {
+            const { data: salesEvent } = await supabase
+                .from('sales_events')
+                .select('product_id')
+                .eq('customer_email', sender)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-            return str
-                .toLowerCase()
-                .normalize('NFD') // Decompose accented characters
-                .replace(/[\u0300-\u036f]/g, '') // Remove diacritics (accents)
-                .replace(/[^\w\s]/g, '') // Remove punctuation
-                .replace(/\s+/g, ' ') // Normalize whitespace
-                .trim();
+            if (salesEvent) {
+                productId = salesEvent.product_id;
+                console.log('[Email Inbound] ✅ Produto vinculado via histórico de vendas');
+            }
         }
 
-        // Store in database
-        console.log('💾 Salvando no banco:', {
-            produto_identificado: analysis.produto_identificado,
-            product_id: productId
-        });
-
-        const { error: insertError } = await supabase
+        // 5. SALVAR NO BANCO
+        const { data: message, error: insertError } = await supabase
             .from('inbox_messages')
             .insert({
                 user_id: userId,
-                sender: parsed.sender,
-                subject: parsed.subject,
-                body_text: parsed.bodyText,
+                sender,
+                subject,
+                body_text: bodyText,
                 analise_sentimento: analysis.analise_sentimento,
                 intencao: analysis.intencao,
                 resumo_executivo: analysis.resumo_executivo,
                 dores_identificadas: analysis.dores_identificadas,
                 probabilidade_conversao: analysis.probabilidade_conversao,
                 sugestao_resposta: analysis.sugestao_resposta,
-                produto_identificado: analysis.produto_identificado, // NEW
-                product_id: productId, // NEW
+                produto_identificado: analysis.produto_identificado,
+                product_id: productId,
                 raw_analysis: analysis,
                 processed: true,
                 received_at: new Date().toISOString()
-            });
+            })
+            .select()
+            .single();
 
         if (insertError) {
-            console.error('Error inserting email:', insertError);
+            console.error('[Email Inbound] ❌ Erro ao salvar:', insertError);
             throw insertError;
         }
 
-        console.log('Email processed successfully for user:', userId);
-        return NextResponse.json({ success: true, analysis });
+        console.log('[Email Inbound] ✅ Email salvo:', message.id);
+
+        // 6. ATUALIZAR ESTATÍSTICAS
+        const { data: currentConfig } = await supabase
+            .from('user_email_configs')
+            .select('total_emails_received')
+            .eq('id', emailConfig.id)
+            .single();
+
+        await supabase
+            .from('user_email_configs')
+            .update({
+                total_emails_received: (currentConfig?.total_emails_received || 0) + 1,
+                last_email_at: new Date().toISOString()
+            })
+            .eq('id', emailConfig.id);
+
+        console.log('[Email Inbound] 🎉 Processamento completo!');
+
+        return NextResponse.json({
+            success: true,
+            message_id: message.id,
+            analysis: {
+                sentimento: analysis.analise_sentimento,
+                intencao: analysis.intencao,
+                conversao: analysis.probabilidade_conversao
+            }
+        });
 
     } catch (error: any) {
-        console.error('Error processing inbound email:', error);
+        console.error('[Email Inbound] ❌ Erro fatal:', error);
         return NextResponse.json(
             { error: error.message || 'Internal server error' },
             { status: 500 }
         );
     }
+}
+
+// Health check
+export async function GET() {
+    return NextResponse.json({
+        status: 'online',
+        service: 'cloudmailin-inbound',
+        provider: 'CloudMailin',
+        timestamp: new Date().toISOString()
+    });
 }
