@@ -16,9 +16,18 @@ export async function POST(req: Request) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
+        // Preparar dados de update
+        const updateData: any = { status_abordagem: status };
+
+        // Se status = 'recuperado', adicionar data de recuperação
+        if (status === 'recuperado') {
+            updateData.recovered_at = new Date().toISOString();
+            console.log('[API] Status = recuperado, setando recovered_at:', updateData.recovered_at);
+        }
+
         const { data, error } = await supabase
             .from('sales_events')
-            .update({ status_abordagem: status })
+            .update(updateData)
             .eq('id', leadId)
             .select();
 

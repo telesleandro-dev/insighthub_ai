@@ -50,6 +50,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           created_at,
           platform_origin,
           recovery_status,
+          recovered_at,
           products!sales_events_product_id_fkey (
             name
           )
@@ -113,7 +114,9 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
 
     // 1. Gráfico Histórico (Echarts) - APENAS VENDAS RECUPERADAS
     const grouped = recuperadas.reduce((acc: any, curr) => {
-      const dateKey = new Date(curr.created_at).toISOString().split('T')[0];
+      // ⬅️ CORREÇÃO: Usar recovered_at quando disponível, fallback para created_at
+      const dateToUse = curr.recovered_at || curr.created_at;
+      const dateKey = new Date(dateToUse).toISOString().split('T')[0];
       acc[dateKey] = (acc[dateKey] || 0) + (Number(curr.value) || 0);
       return acc;
     }, {});
