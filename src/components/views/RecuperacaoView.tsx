@@ -281,6 +281,7 @@ export default function RecuperacaoView() {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente / Origem</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Data/Hora</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Produto</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Valor</th>
@@ -304,6 +305,18 @@ export default function RecuperacaoView() {
                       {lead.platform_origin}
                     </span>
                     <span>{lead.customer_email}</span>
+                  </div>
+                </td>
+
+                {/* COLUNA DATA/HORA */}
+                <td className="px-6 py-4">
+                  <div className="flex flex-col text-xs">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                      {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {new Date(lead.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
                 </td>
 
