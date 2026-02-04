@@ -85,6 +85,32 @@ async function cleanupPreviousEvents(
     }
 }
 
+/**
+ * Retorna mensagem descritiva baseada no status
+ */
+function getStatusMessage(status: string, paymentMethod?: string): { emoji: string; text: string } {
+    const statusLower = status.toLowerCase();
+
+    const statusMap: Record<string, { emoji: string; text: string }> = {
+        'abandoned': { emoji: '⚠️', text: 'CARRINHO ABANDONADO' },
+        'waiting_payment': {
+            emoji: paymentMethod === 'pix' ? '⏳' : '⏳',
+            text: paymentMethod === 'pix' ? 'PIX GERADO' : 'AGUARDANDO PAGAMENTO'
+        },
+        'pending': { emoji: '⏳', text: 'PAGAMENTO PENDENTE' },
+        'refused': { emoji: '❌', text: 'PAGAMENTO RECUSADO' },
+        'rejected': { emoji: '❌', text: 'PAGAMENTO REJEITADO' },
+        'expired': { emoji: '⏰', text: 'PIX EXPIRADO' },
+        'paid': { emoji: '✅', text: 'VENDA APROVADA' },
+        'approved': { emoji: '✅', text: 'VENDA APROVADA' },
+        'complete': { emoji: '✅', text: 'VENDA CONCLUÍDA' },
+        'refunded': { emoji: '↩️', text: 'VENDA ESTORNADA' },
+        'chargeback': { emoji: '⚠️', text: 'CHARGEBACK' }
+    };
+
+    return statusMap[statusLower] || { emoji: '📌', text: 'NOVO EVENTO' };
+}
+
 
 /**
  * Handler POST para webhooks de todas as plataformas
@@ -292,19 +318,19 @@ export async function POST(req: Request) {
         if (userConfig.telegram_token && userConfig.telegram_chat_id) {
             try {
                 const userBot = new TelegramBot(userConfig.telegram_token);
-                const isAbandonment = normalizedData.status !== 'paid';
 
-                const emoji = isAbandonment ? '⚠️' : '✅';
-                const statusText = isAbandonment ? '*CARRINHO ABANDONADO*' : '*VENDA APROVADA*';
+                // Obter mensagem descritiva baseada no status
+                const statusInfo = getStatusMessage(normalizedData.status, normalizedData.metadata?.payment_method);
 
-                const message = `🚀 *InsightHub AI*\n\n${emoji} ${statusText}\n\n👤 *Cliente:* ${normalizedData.customerName}\n💰 *Valor:* R$ ${normalizedData.amount.toFixed(2)}\n📦 *Produto:* ${normalizedData.productName}\n🏷️ *Plataforma:* ${adapter.displayName.toUpperCase()}`;
+                const message = `🚀 *InsightHub AI*\n\n${statusInfo.emoji} *${statusInfo.text}*\n\n👤 *Cliente:* ${normalizedData.customerName}\n💰 *Valor:* R$ ${normalizedData.amount.toFixed(2)}\n📦 *Produto:* ${normalizedData.productName}\n🏷️ *Plataforma:* ${adapter.displayName.toUpperCase()}`;
 
                 const options: any = {
                     parse_mode: 'Markdown'
                 };
 
-                // Adiciona botão de WhatsApp se for abandono e tiver telefone
-                if (isAbandonment && normalizedData.customerPhone) {
+                // Adiciona botão de WhatsApp se for abandono/recusa e tiver telefone
+                const shouldShowWhatsApp = ['abandoned', 'refused', 'rejected', 'expired'].includes(normalizedData.status.toLowerCase());
+                if (shouldShowWhatsApp && normalizedData.customerPhone) {
                     const phoneClean = normalizedData.customerPhone.replace(/\D/g, '');
                     options.reply_markup = {
                         inline_keyboard: [[{
