@@ -2,19 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Copy, Check, Globe, Key, ShieldCheck, Plus,
-  Trash2, MessageCircle, FileUp, Save, Loader2, Brain, CheckCircle,
-  Eye, EyeOff, Info, Activity, ChevronDown, LayoutDashboard, Database, Bell, Mail, Zap
+  Copy, Check, Globe, ShieldCheck,
+  MessageCircle, FileUp, Save, Loader2, Brain, CheckCircle,
+  Info, Activity, LayoutDashboard, Database, Bell, Mail, Zap
 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
-const PLATFORM_OPTIONS = [
-  { id: 'kiwify', name: 'Kiwify', label: 'API Key (Opcional)', placeholder: 'Cole sua API Key da Kiwify' },
-  { id: 'hotmart', name: 'Hotmart', label: 'Token de Segurança (H-Token)', placeholder: 'O H-Token gerado na Hotmart' },
-  { id: 'eduzz', name: 'Eduzz', label: 'API Key / Public Token', placeholder: 'Sua chave de API da Eduzz' },
-  { id: 'monetizze', name: 'Monetizze', label: 'Chave Única', placeholder: 'Sua chave única da Monetizze' }
-];
+
 
 export default function ConfiguracoesView() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -23,10 +18,6 @@ export default function ConfiguracoesView() {
   const [saved, setSaved] = useState(false);
   const [aiTone, setAiTone] = useState('consultivo');
   const [activeTab, setActiveTab] = useState<'webhook' | 'email'>('webhook');
-  const [apiKeys, setApiKeys] = useState([
-    { name: 'kiwify', value: '' }
-  ]);
-  const [visibleKeys, setVisibleKeys] = useState<{ [key: number]: boolean }>({});
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
@@ -49,7 +40,7 @@ export default function ConfiguracoesView() {
     async function loadSettings() {
       const { data: settingsData } = await supabase
         .from('user_settings')
-        .select('ai_tone, api_keys')
+        .select('ai_tone')
         .eq('user_id', user!.id)
         .maybeSingle();
 
@@ -62,9 +53,6 @@ export default function ConfiguracoesView() {
       if (isMounted) {
         if (settingsData) {
           setAiTone(settingsData.ai_tone || 'consultivo');
-          if (settingsData.api_keys && Array.isArray(settingsData.api_keys)) {
-            setApiKeys(settingsData.api_keys);
-          }
         }
         if (configData) {
           setTelegramEnabled(configData.telegram_enabled ?? true);
@@ -80,14 +68,7 @@ export default function ConfiguracoesView() {
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
 
-  const addKeyField = () => setApiKeys([...apiKeys, { name: 'kiwify', value: '' }]);
-  const removeKeyField = (index: number) => setApiKeys(apiKeys.filter((_, i) => i !== index));
 
-  const updateKey = (index: number, field: string, val: string) => {
-    const newKeys = [...apiKeys];
-    (newKeys[index] as any)[field] = val;
-    setApiKeys(newKeys);
-  };
 
   const handleSaveAll = async () => {
     if (!user) return;
@@ -99,7 +80,6 @@ export default function ConfiguracoesView() {
         body: JSON.stringify({
           userId: user.id,
           aiTone,
-          apiKeys,
           telegramToken,
           telegramChatId
         }),
@@ -250,68 +230,7 @@ export default function ConfiguracoesView() {
               </div>
             </section>
 
-            {/* CARD 2: CONECTORES DE API */}
-            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-2">
-                  <Key className="text-blue-600" size={18} />
-                  <div>
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm">Chaves de API</h3>
-                    <p className="text-[10px] text-slate-400 font-medium">Conecte suas contas para importar dados históricos.</p>
-                  </div>
-                </div>
-                <button onClick={addKeyField} className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors flex items-center gap-1">
-                  <Plus size={12} /> Adicionar
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {apiKeys.map((key, index) => {
-                  const platformConfig = PLATFORM_OPTIONS.find(p => p.id === key.name) || PLATFORM_OPTIONS[0];
-                  return (
-                    <div key={index} className="flex gap-3 items-start bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 transition-all hover:shadow-sm">
-                      <div className="w-1/3 min-w-[120px]">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Plataforma</label>
-                        <div className="relative">
-                          <select
-                            className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
-                            value={key.name}
-                            onChange={(e) => updateKey(index, 'name', e.target.value)}
-                          >
-                            {PLATFORM_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
-                          </select>
-                          <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Credencial</label>
-                        <div className="relative">
-                          <input
-                            type={visibleKeys[index] ? "text" : "password"}
-                            placeholder={platformConfig.placeholder}
-                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-[11px] font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                            value={key.value}
-                            onChange={(e) => updateKey(index, 'value', e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setVisibleKeys(prev => ({ ...prev, [index]: !prev[index] }))}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 p-1"
-                          >
-                            {visibleKeys[index] ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        </div>
-                      </div>
-                      <button onClick={() => removeKeyField(index)} className="mt-6 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* CARD 3: BASE DE CONHECIMENTO */}
+            {/* CARD 2: BASE DE CONHECIMENTO */}
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-start gap-4">
                 <div className="bg-slate-100 p-3 rounded-xl">

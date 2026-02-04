@@ -287,7 +287,30 @@ export async function POST(req: Request) {
             );
         }
 
-        // 8. REGISTRAR EVENTO DE VENDA
+        // 8. VERIFICAR SE JÁ EXISTE EVENTO COM MESMO external_transaction_id
+        if (normalizedData.transactionId) {
+            const { data: existingEvent } = await supabase
+                .from('sales_events')
+                .select('id, created_at')
+                .eq('external_transaction_id', normalizedData.transactionId)
+                .eq('user_id', userConfig.user_id)
+                .maybeSingle();
+
+            if (existingEvent) {
+                console.log('[Webhook] ⚠️ WEBHOOK DUPLICADO IGNORADO!');
+                console.log('[Webhook] Transaction ID:', normalizedData.transactionId);
+                console.log('[Webhook] Evento já existe:', existingEvent.id);
+                console.log('[Webhook] Criado em:', existingEvent.created_at);
+
+                return NextResponse.json({
+                    success: true,
+                    message: 'Webhook duplicado ignorado',
+                    existing_event_id: existingEvent.id
+                });
+            }
+        }
+
+        // 9. REGISTRAR EVENTO DE VENDA
         const { error: dbError } = await supabase.from('sales_events').insert({
             user_id: userConfig.user_id,
             product_id: productRecord.id,
