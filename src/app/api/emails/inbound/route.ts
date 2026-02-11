@@ -8,7 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeEmail } from '@/lib/ai/emailAnalyzer';
+// import { analyzeEmail } from '@/lib/ai/emailAnalyzer'; // TODO: Implementar quando ativo
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -89,8 +89,21 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. ANALISAR EMAIL COM IA (Gemini)
-        console.log('[Email Inbound] 🤖 Iniciando análise com Gemini...');
-        const analysis = await analyzeEmail(sender, subject, bodyText);
+        // TODO: Implementar analyzeEmail quando funcionalidade estiver ativa
+        console.log('[Email Inbound] 🤖 Análise com IA temporariamente desabilitada');
+
+        // Mock temporário da análise
+        const analysis = {
+            analise_sentimento: 'neutro',
+            intencao: 'duvida',
+            resumo_executivo: `Email de ${sender} sobre ${subject}`,
+            dores_identificadas: [],
+            probabilidade_conversao: 50,
+            sugestao_resposta: 'Aguardando implementação de IA',
+            produto_identificado: null
+        };
+
+        // const analysis = await analyzeEmail(sender, subject, bodyText);
         console.log('[Email Inbound] ✅ Análise completa:', {
             sentimento: analysis.analise_sentimento,
             intencao: analysis.intencao,
