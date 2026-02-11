@@ -1,0 +1,11 @@
+// BACKUP da lógica ORIGINAL do Dashboard (antes das mudanças)
+
+// Linha 56 ORIGINAL:
+lead_profile:leads_profiles(lead_score)
+
+// Linhas 108-112 ORIGINAIS:
+// 2. Leads Quentes (Score >= 80)
+// Alinhado com o filtro "Mais Quentes" da view de Inteligência
+const hotLeadsCount = filtered.filter(e =>
+  e.lead_profile && e.lead_profile.lead_score >= 80
+).length;

@@ -10,6 +10,7 @@ import { KiwifyAdapter } from './kiwify.adapter';
 import { HotmartAdapter } from './hotmart.adapter';
 import { EduzzAdapter } from './eduzz.adapter';
 import { MonetizzeAdapter } from './monetizze.adapter';
+import { InsightHubAdapter } from './insighthub.adapter';
 
 /**
  * Singleton que gerencia todos os adaptadores de plataforma
@@ -33,6 +34,7 @@ class PlatformRegistry {
         this.register(new HotmartAdapter());
         this.register(new EduzzAdapter());
         this.register(new MonetizzeAdapter());
+        this.register(new InsightHubAdapter());
 
         this.initialized = true;
 

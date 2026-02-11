@@ -5,7 +5,7 @@ import {
   Copy, Check, Globe, ShieldCheck,
   MessageCircle, FileUp, Save, Loader2, Brain, CheckCircle,
   Info, Activity, LayoutDashboard, Database, Bell, Mail, Zap,
-  FileText, Trash2
+  FileText, Trash2, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,11 +17,12 @@ export default function ConfiguracoesView() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [aiTone, setAiTone] = useState('consultivo');
-  const [activeTab, setActiveTab] = useState<'webhook' | 'email'>('webhook');
+  const [loadingSettings, setLoadingSettings] = useState(true); // Loading das configurações
+  const [aiTone, setAiTone] = useState<string>('consultivo');
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [showToken, setShowToken] = useState(false); // Toggle visibilidade do token
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -49,30 +50,29 @@ export default function ConfiguracoesView() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!user) return;
 
     async function loadSettings() {
-      const { data: settingsData } = await supabase
-        .from('user_settings')
-        .select('ai_tone')
-        .eq('user_id', user!.id)
-        .maybeSingle();
+      if (!user?.id) {
+        if (!authLoading) setLoadingSettings(false);
+        return;
+      }
 
+      setLoadingSettings(true);
+      // Buscar ai_tone de user_configs (onde a IA também busca)
       const { data: configData } = await supabase
         .from('user_configs')
-        .select('telegram_enabled, telegram_token, telegram_chat_id')
-        .eq('user_id', user!.id)
+        .select('ai_tone, telegram_enabled, telegram_token, telegram_chat_id')
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (isMounted) {
-        if (settingsData) {
-          setAiTone(settingsData.ai_tone || 'consultivo');
-        }
         if (configData) {
+          setAiTone(configData.ai_tone || 'consultivo');
           setTelegramEnabled(configData.telegram_enabled ?? true);
           setTelegramToken(configData.telegram_token || '');
           setTelegramChatId(configData.telegram_chat_id || '');
         }
+        setLoadingSettings(false);
 
         // COMENTADO: Load email config CloudMailin (aguardando hospedagem de domínio)
         // const { data: emailConfigData } = await supabase
@@ -95,15 +95,17 @@ export default function ConfiguracoesView() {
         // }
       }
     }
-    loadSettings();
+    if (user?.id || !authLoading) {
+      loadSettings();
+    }
     return () => { isMounted = false; };
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   // Carregar arquivos da base de conhecimento
   useEffect(() => {
     const loadFiles = async () => {
       if (!user) return;
-      
+
       setLoadingFiles(true);
       try {
         const { data, error } = await supabase
@@ -137,31 +139,31 @@ export default function ConfiguracoesView() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch('/api/settings/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          aiTone,
-          telegramToken,
-          telegramChatId
-        }),
-      });
+      // Usar UPDATE direto ao invés de UPSERT (workaround para erro 400)
+      const { data, error } = await supabase
+        .from('user_configs')
+        .update({
+          ai_tone: aiTone,
+          telegram_enabled: telegramEnabled,
+          telegram_token: telegramToken,
+          telegram_chat_id: telegramChatId
+        })
+        .eq('user_id', user.id);
 
-      await supabase.from('user_configs').upsert({
-        user_id: user.id,
-        telegram_enabled: telegramEnabled,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
-
-      if (response.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      } else {
-        alert("Erro ao salvar no banco.");
+      if (error) {
+        console.error('❌ [SaveConfig] Erro ao atualizar:', error);
+        console.error('   Message:', error.message);
+        console.error('   Details:', error.details);
+        alert(`Erro: ${error.message}`);
+        return;
       }
+
+      console.log('✅ [SaveConfig] Salvo com sucesso!');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (error) {
-      alert("Falha de conexão.");
+      console.error('💥 [SaveConfig] Exception:', error);
+      alert("Falha ao salvar configurações.");
     } finally {
       setLoading(false);
     }
@@ -191,7 +193,7 @@ export default function ConfiguracoesView() {
 
       const uploadResult = await uploadResponse.json();
       if (!uploadResponse.ok) throw new Error(uploadResult.error);
-      
+
       const insertedFile = uploadResult.file;
 
       alert('✅ Arquivo enviado! Processando texto...');
@@ -303,74 +305,32 @@ export default function ConfiguracoesView() {
               <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Zap className="text-amber-500" size={18} />
-                  <h3 className="font-bold text-slate-800 dark:text-white text-sm">Canais de Entrada de Dados</h3>
-                </div>
-                {/* Tabs Switcher */}
-                <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg self-start">
-                  <button
-                    onClick={() => setActiveTab('webhook')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'webhook' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                  >
-                    Webhook
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('email')}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'email' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                  >
-                    E-mail
-                  </button>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm">URL do Webhook</h3>
                 </div>
               </div>
 
               <div className="p-6">
-                {activeTab === 'webhook' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="flex justify-between items-start">
-                      <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
-                        URL única para receber notificações de venda da <strong>Kiwify, Hotmart, Eduzz ou Monetizze</strong>. Copie e cole na configuração de webhook da sua plataforma.
-                      </p>
-                      <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Ativo
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
-                      <Globe className="text-slate-400" size={16} />
-                      <code className="text-[11px] text-slate-600 dark:text-slate-300 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
-                      <button onClick={() => copyToClipboard(webhookUrl)} className="p-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm">
-                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 px-1">
-                      <ShieldCheck size={12} className="text-slate-400" />
-                      <span className="text-[10px] text-slate-400 font-medium">Conexão segura via SSL (HTTPS)</span>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'email' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg">
-                      Encaminhe e-mails de dúvidas de leads para este endereço. Nossa IA analisará o conteúdo e gerará insights no menu <strong>Inteligência de Produto</strong>.
+                <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                  <div className="flex justify-between items-start">
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
+                      URL única para receber notificações de venda da <strong>Kiwify, Hotmart, Eduzz ou Monetizze</strong>. Copie e cole na configuração de webhook da sua plataforma.
                     </p>
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
-                      <Mail className="text-slate-400" size={16} />
-                      <code className="text-[11px] text-slate-600 dark:text-slate-300 flex-1 truncate font-mono font-bold select-all">
-                        {profile?.insighthub_email || 'Carregando...'}
-                      </code>
-                      <button
-                        onClick={() => copyToClipboard(profile?.insighthub_email || '')}
-                        className="p-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm"
-                        disabled={!profile?.insighthub_email}
-                      >
-                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 px-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 w-fit px-2 py-1 rounded">
-                      <Info size={12} />
-                      <span className="text-[10px] font-bold">Endereço exclusivo. Não compartilhe publicamente.</span>
-                    </div>
+                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Ativo
+                    </span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                    <Globe className="text-slate-400" size={16} />
+                    <code className="text-[11px] text-slate-600 dark:text-slate-300 flex-1 truncate font-mono font-bold">{webhookUrl}</code>
+                    <button onClick={() => copyToClipboard(webhookUrl)} className="p-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm">
+                      {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 px-1">
+                    <ShieldCheck size={12} className="text-slate-400" />
+                    <span className="text-[10px] text-slate-400 font-medium">Conexão segura via SSL (HTTPS)</span>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -426,7 +386,7 @@ export default function ConfiguracoesView() {
                   </h5>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                     {knowledgeFiles.map((file) => (
-                      <div 
+                      <div
                         key={file.id}
                         className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 group hover:border-purple-300 dark:hover:border-purple-600 transition-all"
                       >
@@ -480,47 +440,56 @@ export default function ConfiguracoesView() {
           <div className="lg:col-span-4 space-y-6">
 
             {/* CARD 4: PERSONALIDADE IA */}
-            <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+            <section className={`bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5 transition-opacity duration-200 ${loadingSettings ? 'opacity-50' : 'opacity-100'}`}>
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Brain className="text-purple-600" size={18} />
                 <h3 className="font-bold text-slate-800 text-sm">Personalidade da IA</h3>
               </div>
 
-              <div className="flex flex-col gap-3">
-                {(Object.entries(toneData) as [string, any][]).map(([key, data]) => {
-                  const isSelected = aiTone === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setAiTone(key)}
-                      className={`relative group flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected
-                        ? 'border-purple-600 bg-purple-50 shadow-sm'
-                        : 'border-transparent bg-slate-50 hover:bg-slate-100 hover:border-slate-200'
-                        }`}
-                    >
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${isSelected ? 'border-purple-600' : 'border-slate-300 group-hover:border-slate-400'}`}>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-purple-600" />}
-                      </div>
-                      <div>
-                        <span className={`text-xs font-bold block mb-0.5 ${isSelected ? 'text-purple-900' : 'text-slate-700'}`}>
-                          {data.title}
-                        </span>
-                        <span className="text-[10px] text-slate-500 leading-tight block">
-                          {data.desc}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="bg-slate-900 text-slate-300 p-4 rounded-xl text-[10px] italic leading-relaxed relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-2 opacity-10">
-                  <MessageCircle size={40} />
+              {loadingSettings ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-purple-600" size={24} />
+                  <span className="ml-2 text-xs text-slate-500">Carregando...</span>
                 </div>
-                <span className="font-bold text-purple-400 not-italic block mb-1">Exemplo de resposta:</span>
-                "{toneData[aiTone as keyof typeof toneData].ex}"
-              </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3">
+                    {(Object.entries(toneData) as [string, any][]).map(([key, data]) => {
+                      const isSelected = aiTone === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setAiTone(key)}
+                          className={`relative group flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected
+                            ? 'border-purple-600 bg-purple-50 shadow-sm'
+                            : 'border-transparent bg-slate-50 hover:bg-slate-100 hover:border-slate-200'
+                            }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${isSelected ? 'border-purple-600' : 'border-slate-300 group-hover:border-slate-400'}`}>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-purple-600" />}
+                          </div>
+                          <div>
+                            <span className={`text-xs font-bold block mb-0.5 ${isSelected ? 'text-purple-900' : 'text-slate-700'}`}>
+                              {data.title}
+                            </span>
+                            <span className="text-[10px] text-slate-500 leading-tight block">
+                              {data.desc}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="bg-slate-900 text-slate-300 p-4 rounded-xl text-[10px] italic leading-relaxed relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                      <MessageCircle size={40} />
+                    </div>
+                    <span className="font-bold text-purple-400 not-italic block mb-1">Exemplo de resposta:</span>
+                    "{toneData[aiTone as keyof typeof toneData].ex}"
+                  </div>
+                </>
+              )}
             </section>
 
             {/* CARD 5: NOTIFICAÇÕES (Telegram) */}
@@ -547,13 +516,22 @@ export default function ConfiguracoesView() {
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2 pt-2">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Bot Token</label>
-                    <input
-                      type="password"
-                      value={telegramToken}
-                      onChange={(e) => setTelegramToken(e.target.value)}
-                      placeholder="Ex: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-all font-mono text-slate-700"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showToken ? "text" : "password"}
+                        value={telegramToken}
+                        onChange={(e) => setTelegramToken(e.target.value)}
+                        placeholder="Ex: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 pr-10 text-xs outline-none focus:border-blue-500 transition-all font-mono text-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Chat ID</label>
@@ -572,7 +550,7 @@ export default function ConfiguracoesView() {
               )}
 
               <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-50 pt-3">
-                Receba notificações de novas vendas, abandonos de carrinho e insights de produto diretamente no seu celular.
+                Receba notificações de novas vendas, abandonos de carrinho e insights estratégicos de leads diretamente no seu celular.
               </p>
             </section>
 

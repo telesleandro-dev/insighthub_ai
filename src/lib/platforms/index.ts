@@ -41,6 +41,15 @@ export interface NormalizedSaleData {
 
   /** Metadados específicos da plataforma (armazenados como JSON) */
   metadata?: Record<string, any>;
+
+  /** Inteligência de Leads: Fonte de origem customizada */
+  leadSource?: string;
+
+  /** Inteligência de Leads: Tags de segmentação */
+  leadTags?: string[];
+
+  /** Inteligência de Leads: Observações contextuais */
+  leadNotes?: string;
 }
 
 /**

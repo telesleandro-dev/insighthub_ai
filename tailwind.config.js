@@ -1,6 +1,6 @@
 module.exports = {
   darkMode: 'class',
-  important: true, // Adicione esta linha aqui
+  important: true,
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],

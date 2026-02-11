@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1208174f-2a8d-4396-b8cc-3b0b0312af3a",
+    "user_id": "c048be53-fff6-4446-a8b8-6abf79fce171",
+    "customer_name": "Bruno Abandono",
+    "customer_email": "bruno.abandono@teste.com",
+    "customer_phone": "",
+    "status": "abandoned",
+    "platform_origin": "insighthub",
+    "value": 997,
+    "checkout_url": null,
+    "created_at": "2026-02-06T18:26:47.33004+00:00",
+    "custom_discount_link": null,
+    "status_abordagem": "pendente",
+    "external_transaction_id": "ABD-001",
+    "platform_metadata": {
+      "tags": [],
+      "source": "insighthub",
+      "original_platform": "Kiwify"
+    },
+    "recovery_status": "eligible",
+    "payment_method": null,
+    "converted_at": null,
+    "recovered_at": null,
+    "lead_source": "insighthub",
+    "lead_tags": [],
+    "lead_notes": null,
+    "product_name": "Mentoria",
+    "external_product_id": "HUB-GENERIC",
+    "lead_profile_id": "b842c28e-63cc-4568-8772-7f799700a242"
+  }
+]

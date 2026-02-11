@@ -11,6 +11,7 @@
 - [Hotmart](#-hotmart)
 - [Eduzz](#-eduzz)
 - [Monetizze](#-monetizze)
+- [InsightHub API (Geral)](#-insighthub-api)
 - [Como Adicionar Nova Plataforma](#-como-adicionar-nova-plataforma)
 
 ---
@@ -267,6 +268,60 @@
 
 ---
 
+## 🚀 InsightHub API
+
+### Informações Gerais
+
+- **Nome**: InsightHub API (Genérico)
+- **Tipo**: API Central para integrações customizadas
+- **Status**: ✅ Totalmente suportado
+- **Ideal para**: Make.com, n8n, Typeform, formulários próprios e sistemas legados.
+
+### Configuração
+
+1. **Endpoint**: `POST /api/webhook/unified?user_id=SEU_UUID`
+2. **Headers Obrigatórios**:
+   - `Content-Type: application/json`
+   - `x-api-key: SUA_WEBHOOK_SECRET` (definido no seu `.env`)
+
+### Contrato de Dados (Payload)
+
+```json
+{
+  "source": "insighthub",
+  "email": "cliente@exemplo.com",
+  "status": "paid",
+  "product_name": "Nome do Meu Produto",
+  "name": "Nome do Cliente",
+  "phone": "5511999999999",
+  "value": 97.00,
+  "platform": "make"
+}
+```
+
+#### Campos Detalhados:
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `source` | string | **Sim** | Deve ser sempre `"insighthub"` para ativar este adaptador. |
+| `email` | string | **Sim** | Email do lead/cliente. |
+| `status` | string | **Sim** | Status da venda (`paid`, `waiting_payment`, `abandoned`, etc). |
+| `product_name` | string | **Sim** | Nome do produto para identificação automática. |
+| `name` | string | Não | Nome do cliente. |
+| `phone` | string | Não | Celular para recuperação via WhatsApp. |
+| `value` | number | Não | Valor da venda (em Reais). |
+| `platform` | string | Não | Origem customizada (ex: `typeform`, `n8n`). |
+
+### Mapeamento de Status Aceitos
+
+A API normaliza diversos termos para o padrão interno:
+- **Aprovado**: `paid`, `pago`, `aprovado`, `approved`, `concluido`.
+- **Aguardando**: `pending`, `pendente`, `aguardando_pagamento`, `boleto_gerado`, `pix_gerado`.
+- **Cancelado/Recusado**: `refused`, `recusado`, `cancelado`, `expired`.
+- **Abandono**: `abandoned`, `abandonado`, `carrinho_abandonado`.
+
+---
+
 ## ➕ Como Adicionar Nova Plataforma
 
 ### Passo 1: Criar o Adapter
@@ -363,14 +418,14 @@ curl -X POST "https://seu-dominio.com/api/webhook/unified?user_id=SEU_UUID" \
 
 ## 📊 Comparação de Plataformas
 
-| Recurso | Kiwify | Hotmart | Eduzz | Monetizze |
-|---------|--------|---------|-------|-----------|
-| Validação de Assinatura | ❌ | ✅ | ❌ | ❌ |
-| Valores em Centavos | ✅ | ❌ | ❌ | ❌ |
-| Suporte a Recorrência | ✅ | ✅ | ✅ | ✅ |
-| Dados de Afiliado | ✅ | ✅ | ✅ | ✅ |
-| Webhooks em Tempo Real | ✅ | ✅ | ⚠️ | ⚠️ |
-| Documentação Completa | ✅ | ✅ | ⚠️ | ⚠️ |
+| Recurso | Kiwify | Hotmart | Eduzz | Monetizze | InsightHub API |
+|---------|--------|---------|-------|-----------|----------------|
+| Validação de Assinatura | ❌ | ✅ | ❌ | ❌ | ✅ (x-api-key) |
+| Valores em Centavos | ✅ | ❌ | ❌ | ❌ | ❌ (Reais) |
+| Suporte a Recorrência | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Dados de Afiliado | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Webhooks em Tempo Real | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
+| Documentação Completa | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
 
 **Legenda**:
 - ✅ Suportado/Bom

@@ -10,21 +10,44 @@ export async function getKnowledgeContext(userId: string, productId?: string): P
         process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     );
 
-    const query = supabase
-        .from('knowledge_files')
-        .select('file_name, extracted_text')
-        .eq('user_id', userId)
-        .eq('processing_status', 'completed')
-        .not('extracted_text', 'is', null);
+    let data = null;
 
-    // Se tiver product_id, filtrar por produto
+    // Estratégia 1: Buscar conhecimento específico do produto
     if (productId) {
-        query.eq('product_id', productId);
+        const { data: specificData, error: specificError } = await supabase
+            .from('knowledge_files')
+            .select('file_name, extracted_text')
+            .eq('user_id', userId)
+            .eq('processing_status', 'completed')
+            .eq('product_reference', productId)
+            .not('extracted_text', 'is', null)
+            .limit(5);
+
+        if (specificData && specificData.length > 0) {
+            data = specificData;
+            console.log(`📚 [Knowledge] Encontrado conhecimento específico do produto: ${data.length} arquivo(s)`);
+        }
     }
 
-    const { data, error } = await query.limit(5); // Máximo 5 arquivos
+    // Estratégia 2 (Fallback): Buscar qualquer conhecimento do usuário
+    if (!data || data.length === 0) {
+        const { data: genericData, error: genericError } = await supabase
+            .from('knowledge_files')
+            .select('file_name, extracted_text')
+            .eq('user_id', userId)
+            .eq('processing_status', 'completed')
+            .not('extracted_text', 'is', null)
+            .limit(3);  // Limitar para não sobrecarregar o prompt
 
-    if (error || !data || data.length === 0) {
+        if (genericData && genericData.length > 0) {
+            data = genericData;
+            console.log(`📚 [Knowledge] Usando conhecimento genérico do usuário: ${data.length} arquivo(s)`);
+        } else {
+            console.log(`📚 [Knowledge] Nenhum arquivo encontrado para user_id: ${userId}`);
+        }
+    }
+
+    if (!data || data.length === 0) {
         return '';
     }
 

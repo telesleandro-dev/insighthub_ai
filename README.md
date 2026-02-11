@@ -40,6 +40,12 @@ Empreendedores digitais perdem em média **70% das vendas** devido a carrinhos a
 3. **Visibilidade Total**: Acompanhe métricas em tempo real
 4. **ROI Mensurável**: Visualize o faturamento recuperado e taxa de conversão
 
+### 📚 Regras de Negócio (Sniper Mode)
+
+O sistema opera com regras estritas de admissão e cálculo de ROI. Para detalhes sobre a lógica de **"Porteiro"** (Webhook) e **"Lista Limpa"** (Frontend), consulte:
+
+👉 **[REGRAS_DE_NEGOCIO.md](./REGRAS_DE_NEGOCIO.md)**
+
 ---
 
 ## ✨ Funcionalidades Principais
@@ -110,7 +116,7 @@ Empreendedores digitais perdem em média **70% das vendas** devido a carrinhos a
 
 ### Fluxo de Dados
 
-1. **Captura de Evento**: Kiwify envia webhook para `/api/webhook/kiwify?user_id={uuid}`
+1. **Captura de Evento**: Kiwify envia webhook para `/api/webhook/unified?user_id={uuid}`
 2. **Processamento**: 
    - Validação de segurança (user_id)
    - Normalização de dados
@@ -257,7 +263,7 @@ CREATE INDEX idx_products_user ON products(user_id);
 
 1. Acesse sua conta Kiwify
 2. Vá em Configurações > Webhooks
-3. Adicione a URL: `https://seu-dominio.com/api/webhook/kiwify?user_id=SEU_UUID`
+3. Adicione a URL: `https://seu-dominio.com/api/webhook/unified?user_id=SEU_UUID`
 4. Selecione os eventos: `order.paid`, `order.waiting_payment`, `order.refused`
 
 ---
@@ -295,9 +301,8 @@ insighthub_ai/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── webhook/
-│   │   │   │   ├── kiwify/
-│   │   │   │   │   └── route.ts          # Webhook Kiwify
-│   │   │   │   └── route.ts              # Webhook genérico
+│   │   │   │   └── unified/
+│   │   │   │   │   └── route.ts          # Webhook Unificado (Multiplataforma)
 │   │   │   ├── ai/
 │   │   │   │   └── recuperar/
 │   │   │   │       └── route.ts          # IA de recuperação
@@ -345,7 +350,7 @@ insighthub_ai/
 
 ### Kiwify (Plataforma de Pagamentos)
 
-**Webhook URL**: `/api/webhook/kiwify?user_id={uuid}`
+**Webhook URL**: `/api/webhook/unified?user_id={uuid}`
 
 **Eventos Suportados**:
 - `order.paid` - Venda aprovada
@@ -393,8 +398,8 @@ insighthub_ai/
 
 ### Webhooks
 
-#### `POST /api/webhook/kiwify?user_id={uuid}`
-Recebe eventos de venda da Kiwify
+#### `POST /api/webhook/unified?user_id={uuid}`
+Recebe eventos de venda de múltiplas plataformas (Kiwify, Hotmart, Eduzz, Monetizze)
 
 **Query Params**:
 - `user_id` (obrigatório): UUID do usuário

@@ -11,9 +11,9 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AdminUsersView() {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, loading: authLoading } = useAuth();
     const [users, setUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Invite Modal State
@@ -30,8 +30,33 @@ export default function AdminUsersView() {
     const [actionLoading, setActionLoading] = useState(false);
 
     useEffect(() => {
-        fetchUsers();
-    }, []);
+        let isMounted = true;
+
+        async function loadUsers() {
+            if (!currentUser?.id) {
+                console.warn('[AdminUsersView] Aguardando autenticação...');
+                if (isMounted) setLoading(false);
+                return;
+            }
+
+            try {
+                await fetchUsers();
+            } catch (err) {
+                console.error('[AdminUsersView] Erro ao carregar usuários:', err);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        }
+
+        if (!authLoading) {
+            setLoading(true);
+            loadUsers();
+        }
+
+        return () => {
+            isMounted = false;
+        };
+    }, [currentUser?.id, authLoading]);
 
     const fetchUsers = async () => {
         try {
@@ -170,7 +195,7 @@ export default function AdminUsersView() {
     );
 
     return (
-        <div className="p-8 space-y-6 animate-in fade-in duration-500 bg-[#f8f9fc] min-h-full">
+        <div className="p-8 space-y-6 animate-in fade-in duration-500 bg-[#f8f9fc] dark:bg-slate-950">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>

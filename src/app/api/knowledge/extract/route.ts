@@ -52,14 +52,44 @@ export async function POST(req: Request) {
         // 5. Extrair texto baseado no tipo
         try {
             if (fileData.file_type === 'application/pdf') {
-                // PDF - Import dinâmico
+                // PDF - Import dinâmico com tratamento robusto de erros
                 console.log('📄 [Extração] Processando PDF:', fileData.file_name);
 
-                const pdfParse = (await import('pdf-parse')).default;
-                const pdfData = await pdfParse(buffer);
-                extractedText = pdfData.text;
+                try {
+                    // Tentativa 1: pdf-parse (método padrão, rápido)
+                    const pdfParseModule = await import('pdf-parse');
+                    const pdfParse = pdfParseModule.default || pdfParseModule;
+                    const pdfData = await pdfParse(buffer, {
+                        max: 0,  // Sem limite de páginas
+                    });
+                    extractedText = pdfData.text;
+                    console.log('✅ [pdf-parse] PDF processado com sucesso:', extractedText.length, 'chars');
+                } catch (pdfError: any) {
+                    console.warn('⚠️  [Extração] pdf-parse falhou:', pdfError.message);
+                    console.log('💡 [Extração] Tentando extração alternativa (fallback)...');
 
-                console.log('✅ [Extração] PDF processado:', extractedText.length, 'chars');
+                    // Tentativa 2: Extração bruta do buffer (fallback para PDFs problemáticos)
+                    try {
+                        const rawText = buffer.toString('utf8');
+                        extractedText = rawText
+                            .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ')  // Remove caracteres de controle
+                            .replace(/\s+/g, ' ')  // Normaliza espaços múltiplos
+                            .split('\n')
+                            .filter(line => line.trim().length > 0)
+                            .join('\n')
+                            .trim();
+
+                        // Validar se conseguiu extrair texto útil
+                        if (extractedText.length < 50) {
+                            throw new Error('Texto extraído muito curto (possivelmente PDF de imagem ou protegido)');
+                        }
+
+                        console.log('✅ [Fallback] Extração alternativa bem-sucedida:', extractedText.length, 'chars');
+                        console.log('ℹ️  [Fallback] Nota: Formatação pode ter sido perdida no processo');
+                    } catch (fallbackError: any) {
+                        throw new Error(`PDF corrompido, protegido ou apenas imagens. Detalhes: ${fallbackError.message}`);
+                    }
+                }
             } else if (
                 fileData.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
                 fileData.file_name.endsWith('.docx')
