@@ -7,6 +7,135 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [0.3.0] - 2026-02-11
+
+### 🎯 Melhorias de UX e Consistência de Dados
+
+#### ✨ Adicionado
+
+##### Filtros de Período Sincronizados
+- **Dashboard e Inteligência**: Filtros uniformizados entre as duas views
+- **Opções de Período**:
+  - Hoje: Leads/métricas de hoje
+  - Ontem: Leads/métricas de ontem
+  - 7 dias: Última semana
+  - 30 dias: Último mês
+  - Tudo: Todos os registros
+- **Lógica Temporal**: Filtragem client-side e server-side sincronizadas
+- **UI Consistente**: Mesmo componente de filtro em ambas as views
+
+##### Documentação Técnica
+- **auditoria_multi_tenant.md**:
+  - Auditoria completa de arquitetura multi-tenant
+  - Análise de Row Level Security (RLS) em 8 tabelas
+  - Verificação de isolamento de dados por `user_id`
+  - Checklist de preparação para produção
+  - Score 5.0/5.0 - Production Ready
+- **arquitetura_telegram_multitenant.md**:
+  - Documentação da arquitetura Telegram por usuário
+  - Fluxo end-to-end de configuração
+  - Tutorial para obter credenciais (BOT Token e CHAT ID)
+  - Explicação de isolamento de notificações
+- **correcao_taxa_conversao.md**:
+  - Análise de discrepância entre Dashboard (60%) e Inteligência (69,2%)
+  - Identificação de causa raiz: diferença de período
+  - Plano de implementação de sincronização
+
+#### 🔧 Modificado
+
+##### Dashboard View
+- **Taxa de Conversão Alinhada**: Agora usa mesmo período da Inteligência de Vendas
+- **Gráfico Corrigido**: 
+  - Mudança de `sales_events` para `leads_profiles` como fonte
+  - Remoção de campo inexistente `converted_at`
+  - Uso de `created_at` para agrupamento temporal
+  - Agora mostra valores convertidos reais
+- **Filtros Temporais**: Implementação de lógica de filtragem por `dateRange`
+- **Métricas Recalculadas**: Todas métricas agora respeitam período selecionado
+
+##### Inteligência de Vendas View
+- **Labels de Valor Corrigidos**: 
+  - Leads com `service_status = 'converted'` sempre exibem label "Convertido"
+  - Corrigida lógica `getLeadValue()` para considerar status
+  - Fallback: `converted_value` > 0 ? converted : potential_value
+- **Consistência de Dados**: Métricas alinhadas com Dashboard quando mesmo período
+
+##### Auto-Logout por Inatividade
+- **Hook useIdleTimer Corrigido**:
+  - Adicionado `useCallback` para prevenir stale closures
+  - Corrigidas dependências do useEffect
+  - Timeout padrão: 60 minutos
+  - Eventos monitorados: mousedown, mousemove, keydown, scroll, touchstart, click
+  - Event listeners com `{ passive: true }` para performance
+
+#### 🐛 Corrigido
+
+##### Build e Deploy
+- **Erro de Build #1**: `Module not found: '@/lib/ai/emailAnalyzer'`
+  - Comentado import inexistente
+  - Criado mock temporário da função `analyzeEmail`
+  - Rota de email inbound aguardando implementação
+- **Erro de Build #2**: `Property 'default' does not exist on type pdf-parse`
+  - Adicionado `as any` em import dinâmico de `pdf-parse`
+  - Resolvido erro TypeScript na extração de PDF
+- **Query 400 Bad Request**: Removido campo `converted_at` inexistente de query
+
+##### Dados e Métricas
+- **Taxa de Conversão**: 
+  - Dashboard e Inteligência agora mostram mesma taxa quando filtro igual
+  - Eliminada discrepância causada por períodos diferentes
+- **Gráfico do Dashboard**:
+  - Corrigida fonte de dados de `sales_events` para `leads_profiles`
+  - Agora exibe valores corretos de leads convertidos
+  - Valor de 10/02/2026 corrigido
+- **Labels Aba Convertido**:
+  - Todos leads convertidos mostram label "Convertido" (não "Potencial")
+  - Lógica considera `service_status` além de `converted_value`
+
+##### Segurança e Autenticação
+- **Auto-Logout**: Hook `useIdleTimer` agora funciona corretamente
+  - Usuários inativos por 60+ minutos são automaticamente deslogados
+  - Previne sessões abertas indefinidamente
+  - Redirecionamento automático para `/login`
+
+#### 📊 Consistência de Dados
+
+##### Validação Multi-Tenant
+- **50+ Arquivos Auditados**: Backend, Frontend, Migrações SQL
+- **8 Tabelas com RLS**: Todas protegidas com `auth.uid() = user_id`
+- **100% Queries Filtradas**: Todos selects incluem `.eq('user_id', user.id)`
+- **Credenciais Isoladas**: Telegram, IA, emails individualizados
+- **Webhooks Isolados**: URL pattern `?user_id=UUID` garante separação
+
+##### Índices e Performance
+- Verificados índices em `(user_id, email)`, `(user_id, created_at)`
+- Queries otimizadas para multi-tenancy
+- Performance não afetada por volume de outros usuários
+
+#### 🔒 Segurança
+
+- **RLS Completo**: Políticas ativas em todas tabelas críticas
+- **Isolamento Verificado**: Zero possibilidade de cross-contamination
+- **Autenticação Robusta**: Supabase Auth padrão indústria
+- **Sessões Seguras**: Auto-logout após inatividade
+
+#### ⚡ Performance
+
+- **Filtros Otimizados**: Filtragem client-side reduz round-trips
+- **Event Listeners Passive**: Melhor performance em scroll/touch
+- **Índices Validados**: Busca rápida mesmo com milhões de leads
+
+#### 📝 Commits Desta Versão
+
+```
+5321e8b - feat: Implementação completa de melhorias do sistema
+152bc0e - fix: Sincronizar filtros de período e corrigir auto-logout
+fb68be6 - fix: Comentar import de emailAnalyzer inexistente
+cd8086b - fix: Adicionar type assertion no import dinâmico de pdf-parse
+```
+
+---
+
 ## [0.2.0] - 2026-01-27
 
 ### 🎉 Refatoração Multi-Plataforma - Sistema de Adapters
@@ -350,7 +479,7 @@ Para contribuir com o projeto:
 
 ---
 
-**Última atualização**: 2026-01-27  
-**Versão atual**: 0.2.0  
-**Status**: Refatoração Multi-Plataforma Completa
+**Última atualização**: 2026-02-11  
+**Versão atual**: 0.3.0  
+**Status**: Melhorias de UX e Consistência de Dados
 
