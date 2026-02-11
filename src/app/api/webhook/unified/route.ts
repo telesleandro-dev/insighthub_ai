@@ -184,6 +184,56 @@ export async function POST(req: Request) {
         const userId = userIdFromUrl.trim();
         console.log('[Webhook] User ID:', userId);
 
+        // 📌 VALIDAÇÃO DE API KEY (Segurança para N8n e Integrações Externas)
+        const apiKey = req.headers.get('x-api-key');
+
+        if (!apiKey) {
+            console.error('[Webhook] ❌ API Key ausente. Header x-api-key é obrigatório.');
+            return NextResponse.json(
+                {
+                    error: 'Missing API Key',
+                    message: 'Include x-api-key header for authentication',
+                    documentation: 'https://github.com/telesleandro-dev/insighthub_ai#webhook-authentication'
+                },
+                { status: 401 }
+            );
+        }
+
+        // Validar API Key no banco de dados
+        const { data: apiKeyConfig, error: apiConfigError } = await supabase
+            .from('user_configs')
+            .select('user_id, id')
+            .eq('api_key', apiKey)
+            .maybeSingle();
+
+        if (apiConfigError || !apiKeyConfig) {
+            const maskedKey = apiKey.substring(0, 10) + '...';
+            console.error('[Webhook] ❌ API Key inválida:', maskedKey);
+
+            return NextResponse.json(
+                {
+                    error: 'Invalid API Key',
+                    message: 'The provided API key is not valid or has been revoked',
+                    hint: 'Generate a new API key in Settings > Integrations'
+                },
+                { status: 401 }
+            );
+        }
+
+        // Verificar se o user_id da URL corresponde ao da API Key
+        if (apiKeyConfig.user_id !== userId) {
+            console.error('[Webhook] ❌ user_id não corresponde à API Key');
+            return NextResponse.json(
+                {
+                    error: 'User ID Mismatch',
+                    message: 'The user_id in URL does not match the API key owner'
+                },
+                { status: 403 }
+            );
+        }
+
+        console.log('[Webhook] ✅ Autenticado via API Key para user:', userId);
+
         // Debug Service Key
         const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
         console.log('[Webhook] Service Key Present:', hasServiceKey);
