@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
                 try {
                     // Tentativa 1: pdf-parse (método padrão, rápido)
-                    const pdfParseModule = await import('pdf-parse');
+                    const pdfParseModule = await import('pdf-parse') as any;
                     const pdfParse = pdfParseModule.default || pdfParseModule;
                     const pdfData = await pdfParse(buffer, {
                         max: 0,  // Sem limite de páginas
