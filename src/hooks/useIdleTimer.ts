@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -31,7 +31,7 @@ export function useIdleTimer({
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const timeoutMs = timeoutMinutes * 60 * 1000; // Converter minutos para ms
 
-    const handleLogout = async () => {
+    const handleLogout = useCallback(async () => {
         console.log('⏱️ Usuário inativo por', timeoutMinutes, 'minutos. Fazendo logout...');
 
         try {
@@ -47,9 +47,9 @@ export function useIdleTimer({
         } catch (error) {
             console.error('Erro ao fazer logout:', error);
         }
-    };
+    }, [timeoutMinutes, onIdle, router]);
 
-    const resetTimer = () => {
+    const resetTimer = useCallback(() => {
         // Limpa timer anterior
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -57,7 +57,7 @@ export function useIdleTimer({
 
         // Inicia novo timer
         timeoutRef.current = setTimeout(handleLogout, timeoutMs);
-    };
+    }, [handleLogout, timeoutMs]);
 
     useEffect(() => {
         // Eventos que indicam atividade do usuário
@@ -72,7 +72,7 @@ export function useIdleTimer({
 
         // Adiciona listeners
         events.forEach(event => {
-            window.addEventListener(event, resetTimer);
+            window.addEventListener(event, resetTimer, { passive: true });
         });
 
         // Inicia timer pela primeira vez
@@ -87,5 +87,5 @@ export function useIdleTimer({
                 window.removeEventListener(event, resetTimer);
             });
         };
-    }, [timeoutMs]); // Re-executa se timeout mudar
+    }, [resetTimer]); // Agora depende corretamente de resetTimer
 }
