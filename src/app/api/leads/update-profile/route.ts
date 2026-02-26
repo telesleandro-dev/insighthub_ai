@@ -10,7 +10,9 @@ import { NextResponse } from 'next/server';
  */
 export async function POST(req: Request) {
     try {
-        const apiKey = req.headers.get('x-api-key');
+        // Aceita API key via header OU query parameter (compatibilidade com n8n)
+        const { searchParams } = new URL(req.url);
+        const apiKey = req.headers.get('x-api-key') || searchParams.get('api_key');
         const systemSecret = process.env.WEBHOOK_SECRET;
 
         // 1. Validação de Segurança Básica (Master Key)
