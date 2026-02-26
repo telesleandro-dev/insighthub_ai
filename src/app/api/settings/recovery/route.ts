@@ -54,7 +54,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const { userId, settings } = await req.json();
+        let body;
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[API Recovery] ❌ Erro ao parsear JSON:', parseError.message);
+            return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+        }
+
+        const { userId, settings } = body;
 
         if (!userId || !settings) {
             return NextResponse.json({ error: 'userId e settings são obrigatórios' }, { status: 400 });

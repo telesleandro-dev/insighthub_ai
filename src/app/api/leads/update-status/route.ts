@@ -4,7 +4,15 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
     try {
-        const { leadId, status } = await req.json();
+        let body;
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[API Leads Update Status] ❌ Erro ao parsear JSON:', parseError.message);
+            return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+        }
+
+        const { leadId, status } = body;
 
         if (!leadId || !status) {
             return NextResponse.json({ error: 'leadId e status são obrigatórios' }, { status: 400 });

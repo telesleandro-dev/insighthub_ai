@@ -55,11 +55,17 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Parse Request Body
-        const body = await req.json();
-        const { email, name, insighthub_email, role = 'user' } = body;
+        let body;
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[API Admin Invite] ❌ Erro ao parsear JSON:', parseError.message);
+            return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+        }
+        const { email, name, role = 'user' } = body;
 
-        if (!email || !insighthub_email) {
-            return NextResponse.json({ error: 'E-mail e Handle InsightHub são obrigatórios' }, { status: 400 });
+        if (!email) {
+            return NextResponse.json({ error: 'E-mail é obrigatório' }, { status: 400 });
         }
 
         // Validate role
@@ -67,23 +73,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Role inválido. Use "user" ou "admin"' }, { status: 400 });
         }
 
-        console.log(`Iniciando convite para: ${email} (${insighthub_email}) como ${role}`);
+        console.log(`Iniciando convite para: ${email} como ${role}`);
 
-        // 3. Check if InsightHub Email is unique
-        const { data: existingHandle, error: handleCheckError } = await supabaseAdmin
-            .from('profiles')
-            .select('id')
-            .eq('insighthub_email', insighthub_email)
-            .maybeSingle();
-
-        if (handleCheckError) {
-            console.error("Database check error:", handleCheckError);
-            return NextResponse.json({ error: 'Erro ao verificar disponibilidade do handle' }, { status: 500 });
-        }
-
-        if (existingHandle) {
-            return NextResponse.json({ error: 'Este Identificador InsightHub já está em uso' }, { status: 409 });
-        }
 
         // 4. Invite User via Supabase Auth
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
@@ -92,7 +83,6 @@ export async function POST(req: NextRequest) {
         const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
                 name,
-                insighthub_email,
                 role
             },
             redirectTo: `${siteUrl}/auth/callback?next=/definir-senha`

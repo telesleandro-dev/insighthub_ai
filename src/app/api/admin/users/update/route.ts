@@ -42,8 +42,14 @@ export async function POST(req: NextRequest) {
         if (profile?.role !== 'admin') return NextResponse.json({ error: 'Acesso negado: Apenas administradores' }, { status: 403 });
 
         // 2. Parse Body
-        const body = await req.json();
-        const { userId, name, role, insighthub_email, email } = body;
+        let body;
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[API Admin Update] ❌ Erro ao parsear JSON:', parseError.message);
+            return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+        }
+        const { userId, name, role, email } = body;
 
         if (!userId) return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
 
@@ -55,7 +61,6 @@ export async function POST(req: NextRequest) {
             .update({
                 name,
                 role,
-                insighthub_email,
                 email
             })
             .eq('id', userId);
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest) {
 
         // Update Auth Data (Email and Metadata)
         const updateAttributes: any = {
-            user_metadata: { name, role, insighthub_email }
+            user_metadata: { name, role }
         };
 
         // Only update email if provided and different

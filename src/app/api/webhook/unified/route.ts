@@ -168,8 +168,26 @@ export async function POST(req: Request) {
     let detectedPlatform: string = 'unknown';
 
     try {
-        // 1. PARSE DO PAYLOAD
-        body = await req.json();
+        // 1. PARSE DO PAYLOAD COM PROTEÇÃO
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[Webhook] ❌ Erro ao parsear JSON no webhook:', parseError.message);
+            return NextResponse.json(
+                {
+                    error: 'Invalid JSON',
+                    message: 'The request body must be a valid JSON',
+                    details: parseError.message
+                },
+                { status: 400 }
+            );
+        }
+
+        if (!body || Object.keys(body).length === 0) {
+            console.error('[Webhook] ❌ Payload vazio recebido');
+            return NextResponse.json({ error: 'Payload vazio' }, { status: 400 });
+        }
+
         console.log('[Webhook] Payload recebido:', JSON.stringify(body).substring(0, 200) + '...');
 
         // 2. EXTRAÇÃO DO USER_ID
@@ -186,6 +204,7 @@ export async function POST(req: Request) {
 
         // 📌 VALIDAÇÃO DE API KEY (Segurança para N8n e Integrações Externas)
         const apiKey = req.headers.get('x-api-key');
+        const systemSecret = process.env.WEBHOOK_SECRET;
 
         if (!apiKey) {
             console.error('[Webhook] ❌ API Key ausente. Header x-api-key é obrigatório.');
@@ -199,40 +218,48 @@ export async function POST(req: Request) {
             );
         }
 
-        // Validar API Key no banco de dados
-        const { data: apiKeyConfig, error: apiConfigError } = await supabase
-            .from('user_configs')
-            .select('user_id, id')
-            .eq('api_key', apiKey)
-            .maybeSingle();
+        // VERIFICAÇÃO 1: Master Key (WEBHOOK_SECRET do .env)
+        const isMasterKey = systemSecret && apiKey.trim() === systemSecret.trim();
 
-        if (apiConfigError || !apiKeyConfig) {
-            const maskedKey = apiKey.substring(0, 10) + '...';
-            console.error('[Webhook] ❌ API Key inválida:', maskedKey);
+        if (isMasterKey) {
+            console.log('[Webhook] ✅ Autenticado via Master Key (WEBHOOK_SECRET)');
+        } else {
+            console.log(`[Webhook] [DEBUG] Master Key mismatch: Header size: ${apiKey.trim().length}, Env size: ${systemSecret?.trim().length}`);
+            // VERIFICAÇÃO 2: Validar API Key no banco de dados
+            const { data: apiKeyConfig, error: apiConfigError } = await supabase
+                .from('user_configs')
+                .select('user_id, id')
+                .eq('api_key', apiKey)
+                .maybeSingle();
 
-            return NextResponse.json(
-                {
-                    error: 'Invalid API Key',
-                    message: 'The provided API key is not valid or has been revoked',
-                    hint: 'Generate a new API key in Settings > Integrations'
-                },
-                { status: 401 }
-            );
+            if (apiConfigError || !apiKeyConfig) {
+                const maskedKey = apiKey.substring(0, 10) + '...';
+                console.error('[Webhook] ❌ API Key inválida:', maskedKey);
+
+                return NextResponse.json(
+                    {
+                        error: 'Invalid API Key',
+                        message: 'The provided API key is not valid or has been revoked',
+                        hint: 'Generate a new API key in Settings > Integrations or use the system WEBHOOK_SECRET'
+                    },
+                    { status: 401 }
+                );
+            }
+
+            // Verificar se o user_id da URL corresponde ao da API Key
+            if (apiKeyConfig.user_id !== userId) {
+                console.error('[Webhook] ❌ user_id não corresponde à API Key');
+                return NextResponse.json(
+                    {
+                        error: 'User ID Mismatch',
+                        message: 'The user_id in URL does not match the API key owner'
+                    },
+                    { status: 403 }
+                );
+            }
+
+            console.log('[Webhook] ✅ Autenticado via User API Key para user:', userId);
         }
-
-        // Verificar se o user_id da URL corresponde ao da API Key
-        if (apiKeyConfig.user_id !== userId) {
-            console.error('[Webhook] ❌ user_id não corresponde à API Key');
-            return NextResponse.json(
-                {
-                    error: 'User ID Mismatch',
-                    message: 'The user_id in URL does not match the API key owner'
-                },
-                { status: 403 }
-            );
-        }
-
-        console.log('[Webhook] ✅ Autenticado via API Key para user:', userId);
 
         // Debug Service Key
         const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -293,32 +320,33 @@ export async function POST(req: Request) {
             console.log('[Webhook] Bypass Auth Activated');
             bypass = true;
             userAuthData = { user: { id: 'dfe126ac-0bb0-46d9-9d4a-938a22044a4f', email: 'test_setup@insighthub.ai' } };
+        } else if (isMasterKey) {
+            console.log('[Webhook] 🛠️ Master Key bypass: Usando ID da URL diretamente');
+            userAuthData = { user: { id: userId, email: 'system-master@insighthub.ai' } };
         } else {
-            const { data } = await supabase.auth.admin.getUserById(userId);
+            console.log('[Webhook] [DEBUG] Searching for user ID:', userId);
+            const { data, error: authErr } = await supabase.auth.admin.getUserById(userId);
+            if (authErr) console.error('[Webhook] [DEBUG] Auth Admin Error:', authErr.message);
             userAuthData = data;
         }
 
         if (!userAuthData || !userAuthData.user) {
             console.error('[Webhook] Usuário não localizado no Auth', userId);
-            try {
-                const fs = require('fs');
-                fs.appendFileSync('webhook_debug.log', `[ERROR] User Not Found: ${userId} | HasServiceKey: ${!!process.env.SUPABASE_SERVICE_ROLE_KEY}\n`);
-            } catch (e) { }
-
             return NextResponse.json({
                 error: 'Usuário não localizado (Debug)',
                 receivedId: userId,
-                details: 'ID invalido.'
+                debug: { isMasterKey },
+                details: 'ID invalido ou não encontrado no Auth.'
             }, { status: 400 });
         }
 
         // If bypass, use the hardcoded ID for logic
         const effectiveUserId = bypass ? userAuthData.user.id : userId;
 
-        const { data: userConfig, error: configError } = await supabase
+        const { data: dbUserConfig, error: configError } = await supabase
             .from('user_configs')
             .select('user_id, telegram_token, telegram_chat_id')
-            .eq('user_id', effectiveUserId) // Use effectiveUserId here
+            .eq('user_id', effectiveUserId)
             .maybeSingle();
 
         if (configError) {
@@ -329,9 +357,28 @@ export async function POST(req: Request) {
             }, { status: 500 });
         }
 
+        let userConfig = dbUserConfig;
+
+        if (!userConfig && isMasterKey) {
+            console.log('[Webhook] 🛠️ Master Key fallback: Criando configuração temporária em memória');
+            userConfig = {
+                user_id: effectiveUserId,
+                telegram_token: null,
+                telegram_chat_id: null
+            };
+        }
+
         if (!userConfig) {
             console.warn('[Webhook] Usuário não encontrado:', userId);
-            return NextResponse.json({ error: 'Usuário não localizado' }, { status: 401 });
+            return NextResponse.json({
+                error: 'Usuário não localizado',
+                debug: {
+                    isMasterKey,
+                    apiKeySize: apiKey?.trim().length,
+                    systemSecretSize: systemSecret?.trim().length,
+                    match: apiKey?.trim() === (systemSecret || '').trim()
+                }
+            }, { status: 401 });
         }
 
         // 6. NORMALIZAR DADOS DO WEBHOOK
@@ -353,22 +400,19 @@ export async function POST(req: Request) {
         }
 
 
-        // 7. DETERMINAR STATUS DE RECUPERAÇÃO
-        // (Simplificado: apenas verifica se foi contactado anteriormente)
-        const checkIsRecovery = (profile: any) => {
-            return profile?.service_status === 'contacted';
-        };
 
         const statusLower = normalizedData.status.toLowerCase();
 
         // --- LÓGICA DE DECISÃO (GATEKEEPER) ---
 
-        // 1. BUSCAR PERFIL EXISTENTE
+        // 1. BUSCAR PERFIL EXISTENTE (case-insensitive para evitar falhas por capitalização do email)
+        const normalizedEmail = (normalizedData.customerEmail || '').trim().toLowerCase();
+        console.log(`[Webhook] Buscando perfil para user: ${userConfig.user_id}, email: ${normalizedEmail}`);
         const { data: currentProfile } = await supabase
             .from('leads_profiles')
             .select('*')
             .eq('user_id', userConfig.user_id)
-            .eq('email', normalizedData.customerEmail)
+            .ilike('email', normalizedEmail)
             .maybeSingle();
 
         // 2. EVENTO DE SUCESSO (PAID / APPROVED)
@@ -397,9 +441,10 @@ export async function POST(req: Request) {
             console.log(`[Webhook] Verificando ROI para: ${profileToCheck.email} | Status Atual: ${profileToCheck.service_status}`);
 
             // Verificar se é ROI válido (Case insensitive)
+            // Agora aceita tanto 'contacted' quanto 'processed' (IA já rodou)
             const checkIsRecovery = (p: any) => {
                 const status = (p?.service_status || '').toLowerCase();
-                return status === 'contacted';
+                return ['contacted', 'processed'].includes(status);
             };
 
             const isRoiValid = checkIsRecovery(profileToCheck);
@@ -433,7 +478,7 @@ export async function POST(req: Request) {
             const newServiceStatus = isRoiValid ? 'converted' : 'direct_sale';
 
             // 1. Atualizar Perfil de Lead
-            const { error: profileUpdateError } = await supabase
+            const { data: updatedRows, error: profileUpdateError } = await supabase
                 .from('leads_profiles')
                 .update({
                     service_status: newServiceStatus,
@@ -443,10 +488,24 @@ export async function POST(req: Request) {
                     converted_value: normalizedData.amount,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', currentProfile.id);
+                .eq('id', currentProfile.id)
+                .select('id, service_status, email');
 
             if (profileUpdateError) {
-                console.error('[Webhook] Erro ao atualizar perfil:', profileUpdateError.message);
+                console.error('[Webhook] ❌ ERRO CRÍTICO ao atualizar perfil:', profileUpdateError.message, '| Code:', profileUpdateError.code);
+                try {
+                    const fs = require('fs');
+                    fs.appendFileSync('webhook_debug.log', `[CRITICAL UPDATE ERROR] ${new Date().toISOString()} | ID: ${currentProfile.id} | Error: ${profileUpdateError.message}\n`);
+                } catch (e) { }
+            } else {
+                console.log(`[Webhook] ✅ Perfil atualizado: ${updatedRows?.length ?? 0} row(s) | Status: ${newServiceStatus} | ID: ${currentProfile.id}`);
+                if (!updatedRows || updatedRows.length === 0) {
+                    console.error('[Webhook] ⚠️ UPDATE não afetou nenhuma row! Verificar se o ID existe:', currentProfile.id);
+                    try {
+                        const fs = require('fs');
+                        fs.appendFileSync('webhook_debug.log', `[WARNING NO ROWS UPDATED] ${new Date().toISOString()} | ID: ${currentProfile.id} | Status pretendido: ${newServiceStatus}\n`);
+                    } catch (e) { }
+                }
             }
 
             // 2. Registrar Evento de Venda (Sempre registra para histórico, mas ROI depende do recovery_status)
@@ -553,10 +612,13 @@ export async function POST(req: Request) {
         );
 
         let serviceStatus = 'pending';
-        // Se já estava sendo atendido, NÃO voltar para pending para não perder elegibilidade de ROI
+
+        // Se já estava sendo atendido pelo Humano (Contacted), manter status para não quebrar fluxo
         if (currentProfile?.service_status === 'contacted') {
             serviceStatus = 'contacted';
         }
+        // Se era 'processed' (IA já viu) mas chegou nova falha e não foi contatado, volta para pending 
+        // para o n8n re-analisar o contexto completo (opcional, mantemos pending por padrão do Modo Sniper)
 
         const productHistory = currentProfile?.product_history || [];
         if (normalizedData.productName && !productHistory.includes(normalizedData.productName)) {
@@ -589,6 +651,8 @@ export async function POST(req: Request) {
             }
         }
 
+        // Upsert do perfil do lead com incremento de total_events
+        // NOTA: Para atomicidade total sob concorrência extrema, migrar para RPC SQL (ver migration 020)
         const { data: leadProfile, error: profileError } = await supabase
             .from('leads_profiles')
             .upsert({
@@ -603,8 +667,10 @@ export async function POST(req: Request) {
                 last_event_type: normalizedData.status,
                 last_interaction_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-                potential_value: normalizedData.amount > (currentProfile?.potential_value || 0) ? normalizedData.amount : (currentProfile?.potential_value || normalizedData.amount),
+                potential_value: normalizedData.amount,
+                converted_value: 0,
                 service_status: serviceStatus,
+                lead_summary: normalizedData.leadSummary || body.lead_summary || body.analise || body.dossie || currentProfile?.lead_summary || null,
                 last_platform: adapter.displayName
             }, { onConflict: 'user_id,email' })
             .select()

@@ -41,7 +41,7 @@ O processamento de webhooks (`/api/webhook/unified`) segue regras estritas de ad
 *   **Regra**:
     *   O lead é **CRIADO** ou **ATUALIZADO**.
     *   Status definido como `Pending`.
-    *   **Exceção**: Se o status já era `Contacted`, ele **PERMANECE** como `Contacted` (para não perder a marcação de ROI e não resetar o trabalho do vendedor).
+    *   **Exceção**: Se o status já era `Contacted` ou `Processed` (IA já analisou), ele **PERMANECE** no status atual (para não perder a marcação de ROI humano ou evitar re-processamento desnecessário da IA).
     *   Lead entra na lista de recuperação.
     *   Score de propensão é calculado.
 
@@ -51,8 +51,11 @@ O processamento de webhooks (`/api/webhook/unified`) segue regras estritas de ad
 
 ### 1. Filtro de Exibição
 A lista de leads (`InteligenciaLeadsView`) exibe **apenas**:
-*   Status `Pending` (Aguardando ação)
-*   Status `Contacted` (Em negociação)
+*   Status `Processed` (Análise da IA/N8N concluída, pronto para abordagem)
+*   Status `Contacted` (Em negociação iniciada pelo humano)
+
+**Ocultos Automaticamente**:
+*   Status `Pending` (Aguardando análise da IA/Sistema) -> Invisível para não poluir a lista.
 
 **Excluídos Automaticamente**:
 *   Leads convertidos (`Paid`) -> Somem da lista imediatamente.
@@ -71,5 +74,26 @@ A lista de leads (`InteligenciaLeadsView`) exibe **apenas**:
 
 ---
 
-**Última Atualização**: 09/02/2026
-**Versão da Lógica**: 2.0 (Pure ROI)
+## 🔄 Ciclo de Vida do Lead (Fluxo Sniper)
+
+O InsightHub AI opera em três estágios para garantir foco total e baixo ruído:
+
+1.  **Estágio 1: Entrada Silenciosa (`Pending`)**
+    *   Ocorre quando o Webhook recebe uma falha (Abandono, Recusa).
+    *   O Lead é criado/atualizado e o **Score é calculado matematicamente** pelo back-end.
+    *   **Invisível**: O lead NÃO aparece em nenhuma listagem do frontend.
+
+2.  **Estágio 2: Processamento e Enriquecimento (`Processed`)**
+    *   O sistema aguarda o sinal do **n8n** (ou IA externa).
+    *   O n8n chama o endpoint `/api/leads/update-profile` enviando o **Dossiê da IA (`lead_summary`)**.
+    *   O status muda para `Processed`.
+    *   **Visível**: O lead aparece instantaneamente na tela de "Inteligência de Vendas" e no Dashboard como "Lead Pronto".
+
+3.  **Estágio 3: Atendimento Humano (`Contacted`)**
+    *   Ao clicar para abordar, o status muda para `Contacted`.
+    *   O lead é "marcado" para atribuição de ROI. Se comprar, o mérito será do sistema.
+
+---
+
+**Última Atualização**: 12/02/2026
+**Versão da Lógica**: 2.5 (Sniper Flow Edition)

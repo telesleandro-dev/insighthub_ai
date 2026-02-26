@@ -64,6 +64,7 @@ export class InsightHubAdapter implements PlatformAdapter {
             leadSource: payload.source || payload.platform || 'api',
             leadTags: Array.isArray(payload.tags) ? payload.tags : [],
             leadNotes: payload.notes || payload.observacoes || '',
+            leadSummary: payload.lead_summary || payload.summary || payload.dossie || payload.analise || '',
             metadata: {
                 source: payload.source || 'api',
                 original_platform: payload.platform || 'generic',

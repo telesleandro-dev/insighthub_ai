@@ -7,6 +7,42 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [0.3.2] - 2026-02-19
+
+### 🛡️ Estabilização, Sniper Flow e Resiliência de IA
+
+#### ✨ Adicionado
+- **Log de Diagnóstico na IA**: O endpoint `/api/ai/recuperar` agora registra `User-Agent` e payloads detalhados para auditoria de chamadas duplicadas.
+- **Cache de Dossiê Estratégico**: leads já processados ou contatados com um dossiê válido não consomem mais cota da IA desnecessariamente; o sistema reutiliza a análise existente.
+
+#### 🔧 Modificado
+- **Idempotência no Banco de Dados**: O endpoint `/api/leads/update-profile` agora verifica se houve mudança real nos dados antes de gravar no banco, prevenindo loops infinitos em integrações com webhooks externos (ex: n8n).
+- **Consolidação de Hooks**: Unificação de `useEffect` no `InteligenciaLeadsView` e `DashboardView` para evitar disparos redundantes de carregamento e recargas de página.
+
+#### 🐛 Corrigido
+- **Loop de Recarga Infinito**: Removida lógica de `window.location.reload()` e layout redundante `src/app/dashboard/layout.tsx` que causavam ciclos infinitos de renderização.
+- **Referência Supabase**: Corrigido erro de inicialização do cliente Supabase em rotas de API críticas.
+
+---
+
+## [0.3.1] - 2026-02-12
+
+### 🛡️ Resiliência de APIs e Melhorias de Integração
+
+#### ✨ Adicionado
+- **Master Key para Webhooks**: Suporte para uso do `WEBHOOK_SECRET` do sistema como chave de API no header `x-api-key` para integrações técnicas (n8n, Make).
+- **Flexibilidade em APIs de IA**: Rota `/api/ai/recuperar` agora aceita tanto `email` quanto `leadEmail` no payload, facilitando a vida em ferramentas no-code.
+
+#### 🔧 Modificado
+- **Padronização de JSON Resilience**: Implementação sistemática de `try-catch` em torno de `req.json()` em todas as rotas de API e tratamento seguro de fetch no frontend para evitar erros de "Unexpected end of JSON input".
+
+#### 🐛 Corrigido
+- **Sincronização de Satus/Valor no Webhook**: 
+  - Corrigido bug onde o valor do lead ficava "preso" no maior valor histórico. Agora reflete o checkout atual.
+  - Implementado reset automático de status de conversão e limpeza de `converted_value` ao receber novos eventos de abandono para leads já convertidos.
+
+---
+
 ## [0.3.0] - 2026-02-11
 
 ### 🎯 Melhorias de UX e Consistência de Dados

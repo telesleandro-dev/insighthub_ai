@@ -18,7 +18,7 @@ export default function AdminUsersView() {
 
     // Invite Modal State
     const [isInviteOpen, setIsInviteOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', handle: '', role: 'user' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'user' });
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [inviteSuccess, setInviteSuccess] = useState(false);
@@ -81,7 +81,6 @@ export default function AdminUsersView() {
         setInviteSuccess(false);
 
         try {
-            const fullHandle = `${inviteData.handle.split('@')[0]}@insighthubai.com`;
 
             const res = await fetch('/api/admin/users/invite', {
                 method: 'POST',
@@ -92,7 +91,6 @@ export default function AdminUsersView() {
                 body: JSON.stringify({
                     email: inviteData.email,
                     name: inviteData.name,
-                    insighthub_email: fullHandle,
                     role: inviteData.role
                 })
             });
@@ -114,7 +112,7 @@ export default function AdminUsersView() {
             fetchUsers();
             setTimeout(() => {
                 setIsInviteOpen(false);
-                setInviteData({ name: '', email: '', handle: '', role: 'user' });
+                setInviteData({ name: '', email: '', role: 'user' });
                 setInviteSuccess(false);
             }, 2000);
 
@@ -170,8 +168,7 @@ export default function AdminUsersView() {
                     userId: editingUser.id,
                     name: editingUser.name,
                     role: editingUser.role,
-                    email: editingUser.email,
-                    insighthub_email: editingUser.insighthub_email
+                    email: editingUser.email
                 })
             });
 
@@ -235,7 +232,6 @@ export default function AdminUsersView() {
                             <tr>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Usuário</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Perfil</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Handle InsightHub</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-right"></th>
                             </tr>
@@ -274,11 +270,6 @@ export default function AdminUsersView() {
                                                 }`}>
                                                 {user.role}
                                             </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <code className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 font-mono">
-                                                {user.insighthub_email || '-'}
-                                            </code>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1.5">
@@ -388,15 +379,6 @@ export default function AdminUsersView() {
                                 </select>
                             </div>
 
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Controle InsightHub</label>
-                                <input
-                                    type="text"
-                                    value={editingUser.insighthub_email || ''}
-                                    onChange={e => setEditingUser({ ...editingUser, insighthub_email: e.target.value })}
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 font-mono text-slate-900"
-                                />
-                            </div>
 
                             <button
                                 type="submit"
@@ -470,23 +452,6 @@ export default function AdminUsersView() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Handle InsightHub</label>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-l-xl text-sm outline-none focus:border-blue-500 transition-all text-right pr-1 font-sans text-slate-900"
-                                            placeholder="joao.suporte"
-                                            value={inviteData.handle}
-                                            onChange={e => setInviteData({ ...inviteData, handle: e.target.value })}
-                                        />
-                                        <div className="bg-slate-100 border border-l-0 border-slate-200 px-3 py-2.5 rounded-r-xl text-sm text-slate-500 font-medium">
-                                            @insighthubai.com
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 ml-1">Usado para análise de inteligência.</p>
-                                </div>
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Função (Role)</label>

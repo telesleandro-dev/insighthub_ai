@@ -33,7 +33,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^20.19.33",
     "@types/node-telegram-bot-api": "^0.64.13",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -41,6 +41,8 @@
     "eslint-config-next": "14.2.3",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

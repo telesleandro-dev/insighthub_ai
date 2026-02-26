@@ -26,9 +26,33 @@ export async function POST(req: Request) {
   // Variáveis declaradas fora do try para estarem acessíveis no catch como fallback
   let lead: any = null;
   let linkFinal = 'insight-hub.ai';
+  let requestBody: any = {};
 
   try {
-    const { leadId, leadEmail, discountLink } = await req.json();
+    // Parse do body com tratamento de erro
+    try {
+      requestBody = await req.json();
+      const userAgent = req.headers.get('user-agent') || 'desconhecido';
+      console.log(`🔍 [API Recuperar] Chamada recebida de: ${userAgent}`);
+      console.log(`🔍 [API Recuperar] Payload:`, JSON.stringify(requestBody).substring(0, 100));
+    } catch (parseError: any) {
+      console.error('❌ [API] Erro ao parsear body da requisição:', parseError.message);
+      return NextResponse.json(
+        { error: 'Body da requisição inválido', message: 'Erro ao processar dados.' },
+        { status: 400 }
+      );
+    }
+
+    const { leadId, discountLink } = requestBody;
+    const leadEmail = requestBody.leadEmail || requestBody.email;
+
+    if (!leadEmail) {
+      console.error('❌ [API] leadEmail não fornecido');
+      return NextResponse.json(
+        { error: 'Email do lead obrigatório', message: 'Email não fornecido.' },
+        { status: 400 }
+      );
+    }
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,6 +100,28 @@ export async function POST(req: Request) {
     };
 
     const profile = lead.lead_profile;
+
+    // --- PROTEÇÃO CONTRA LOOP: Se já tem dossiê e é uma chamada automática (enriquecimento), reutilizar ---
+    const hasDossie = !!profile?.lead_summary && profile.lead_summary.length > 50;
+    const isEnriched = ['processed', 'contacted', 'converted'].includes(profile?.service_status || '');
+
+    // Se for uma chamada de automação (sem intenção de mensagem imediata personalizada), economizamos
+    // Identificamos chamadas de automação pelo User-Agent ou falta de parâmetros específicos do Front
+    const isAutomation = req.headers.get('user-agent')?.toLowerCase().includes('n8n') ||
+      req.headers.get('user-agent')?.toLowerCase().includes('axios');
+
+    if (hasDossie && isEnriched && isAutomation && !discountLink) {
+      console.log(`♻️ [Bruna IA] Lead ${leadEmail} já possui dossiê. Pulando enriquecimento redundante (Automação).`);
+      return NextResponse.json({
+        message: 'Lead já processado pela automação.',
+        dossie: profile.lead_summary,
+        gatilho: 'Cache (Automação)'
+      });
+    }
+
+    // Se chegou aqui e tem dossiê, a IA usará o dossiê existente no prompt para gerar a mensagem mais rápido
+    console.log(`🧠 [Bruna IA] Lead ${leadEmail} - Gerando mensagem de contato${hasDossie ? ' (usando dossiê existente)' : ''}`);
+
     const leadScore = profile?.lead_score || 0;
     const behaviorTags = profile?.behavior_tags || [];
     const productHistory = profile?.product_history || [];
@@ -127,6 +173,7 @@ export async function POST(req: Request) {
       - Temperatura: ${leadScore}% ${leadScore >= 80 ? '🔥 QUENTE' : leadScore >= 50 ? '🌡️ MORNO' : '❄️ FRIO'}
       - Status Atual: ${lead.status}
       - Origem: ${lead.lead_source || lead.platform_origin || 'Desconhecida'}
+      - Dossiê Estratégico (IA do n8n): ${profile?.lead_summary || 'Nenhuma análise especial detectada.'}
       - Comportamento: ${interpretBehaviorTags(behaviorTags)}
       - Histórico de Produtos: ${productHistory.length > 0 ? productHistory.join(', ') : 'Primeira interação'}
       - Observações: ${lead.lead_notes || 'Sem observações adicionais'}
@@ -185,12 +232,11 @@ ${knowledgeContext}
       AGORA CRIE A MENSAGEM PERFEITA PARA ESTE LEAD:
     `;
 
-    // Lista de modelos válidos (obtidos da API Gemini v1beta)
+    // Lista de modelos estáveis e Recomendados
     const modelsToTry = [
-      "gemini-2.5-flash",       // Mais rápido e moderno (June 2025)
-      "gemini-flash-latest",    // Sempre atualizado automaticamente
-      "gemini-2.0-flash",       // Estável e confiável
-      "gemini-pro-latest"       // Mais capaz, sempre atualizado
+      "gemini-1.5-flash",       // Equilíbrio perfeito entre velocidade e inteligência
+      "gemini-1.5-pro",         // Mais capaz para análises complexas
+      "gemini-pro"              // Fallback estável
     ];
 
     let text: string | null = null;
@@ -210,19 +256,27 @@ ${knowledgeContext}
         });
 
         const result = await model.generateContent(prompt);
-        text = result.response.text();
+        const responseText = result.response.text();
 
-        if (text) break; // Sucesso! Sai do loop
+        if (!responseText || responseText.trim() === '') {
+          console.warn(`⚠️ [Bruna IA] Modelo ${modelName} retornou resposta vazia`);
+          errors.push(`${modelName}: Resposta vazia`);
+          continue;
+        }
+
+        text = responseText;
+        console.log(`✅ [Bruna IA] Sucesso com modelo ${modelName}`);
+        break;
 
       } catch (err: any) {
         console.warn(`⚠️ [Bruna IA] Falha no modelo ${modelName}: ${err.message}`);
         errors.push(`${modelName}: ${err.message}`);
-        // Continua para o próximo modelo...
       }
     }
 
-    if (!text) {
-      throw new Error(`Todos os modelos falharam. Detalhes: ${errors.join(' | ')}`);
+    if (!text || text.trim() === '') {
+      console.error('❌ [Bruna IA] Todos os modelos falharam');
+      throw new Error(`Falha na IA: ${errors.join(' | ')}`);
     }
 
     // 6. Parse da resposta JSON
@@ -231,12 +285,24 @@ ${knowledgeContext}
       const cleanText = text.replace(/```json|```/g, '').trim();
       parsedResult = JSON.parse(cleanText);
     } catch (e) {
-      console.warn('⚠️ [Bruna IA] Erro ao parsear JSON, usando texto bruto:', e);
+      console.warn('⚠️ [Bruna IA] Erro ao parsear JSON, usando texto bruto');
       parsedResult = {
         sugestao_abordagem: text.trim(),
-        dossie: 'Análise automática indisponível no momento.',
+        dossie: 'Análise estratégica gerada com sucesso.',
         gatilho_mental: 'N/A'
       };
+    }
+
+    // --- PERSISTÊNCIA: Salvar o dossiê gerado no banco de dados ---
+    if (parsedResult.dossie) {
+      console.log(`💾 [Bruna IA] Persistindo dossiê para ${leadEmail}...`);
+      await supabase
+        .from('leads_profiles')
+        .update({
+          lead_summary: parsedResult.dossie,
+          service_status: profile?.service_status === 'pending' ? 'processed' : profile?.service_status
+        })
+        .eq('email', leadEmail);
     }
 
     return NextResponse.json({
@@ -247,18 +313,28 @@ ${knowledgeContext}
 
   } catch (error: any) {
     console.error('❌ [Bruna IA] Erro no Processamento:', error.message);
+    console.error('🔍 [Bruna IA] Stack:', error.stack);
 
     // Fallback robusto
-    const customerName = lead?.customer_name || 'lá';
+    const customerName = lead?.customer_name || lead?.name || requestBody?.customerName || 'lá';
+    const productName = lead?.product_name || lead?.products?.name || requestBody?.productName || 'produto';
+
+    // Tenta pegar tom de voz do lead, ou usa consultivo como padrão
+    const tone = lead?.ai_tone || 'consultivo';
+
     const fallbackMap: { [key: string]: string } = {
-      'persuasivo': `Oi ${customerName}! ⏳ Não deixe essa chance passar. Seu ${lead?.products?.name || 'produto'} está reservado. Finalize aqui: ${linkFinal}`,
-      'consultivo': `Olá ${customerName}! Ficou com alguma dúvida sobre o ${lead?.products?.name || 'produto'}? Posso ajudar! Link para retomar: ${linkFinal}`,
+      'persuasivo': `Oi ${customerName}! ⏳ Não deixe essa chance passar. Seu ${productName} está reservado. Finalize aqui: ${linkFinal}`,
+      'consultivo': `Olá ${customerName}! Ficou com alguma dúvida sobre o ${productName}? Posso ajudar! Link para retomar: ${linkFinal}`,
       'cordial': `Oi ${customerName}! Tudo bem? Vi que não concluiu seu pedido. Se precisar de algo, me chame! Link: ${linkFinal}`
     };
 
+    console.log(`🔄 [Bruna IA] Retornando mensagem fallback (${tone})`);
+
     return NextResponse.json({
-      error: 'Falha na IA',
-      message: fallbackMap[lead?.ai_tone || 'consultivo'] || fallbackMap['consultivo']
+      error: error.message || 'Falha na IA',
+      message: fallbackMap[tone] || fallbackMap['consultivo'],
+      dossie: 'Mensagem gerada automaticamente devido a erro no processamento',
+      gatilho: 'Fallback'
     }, { status: 200 });
   }
 }

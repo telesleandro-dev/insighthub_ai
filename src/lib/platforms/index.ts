@@ -50,6 +50,9 @@ export interface NormalizedSaleData {
 
   /** Inteligência de Leads: Observações contextuais */
   leadNotes?: string;
+
+  /** Inteligência de Leads: Análise completa/Dossiê da IA */
+  leadSummary?: string;
 }
 
 /**

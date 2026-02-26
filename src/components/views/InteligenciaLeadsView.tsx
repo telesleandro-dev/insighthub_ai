@@ -50,12 +50,12 @@ export default function InteligenciaLeadsView() {
         const total = rawLeads.length;
         const recovered = totalRecoveredInfo;
 
-        // Pipeline: Soma de leads Pendentes ou Contatados no período
+        // Pipeline: Soma de leads Processados ou Contatados no período
         const potential = rawLeads
-            .filter(l => ['pending', 'contacted'].includes(l.service_status))
+            .filter(l => ['processed', 'contacted'].includes(l.service_status))
             .reduce((acc, l) => acc + Number(l.potential_value || 0), 0);
 
-        const boiling = rawLeads.filter(l => l.lead_score >= 90 && ['pending', 'contacted'].includes(l.service_status)).length;
+        const boiling = rawLeads.filter(l => l.lead_score >= 80 && ['processed', 'contacted'].includes(l.service_status)).length;
 
         const convertedCount = rawLeads.filter(l => l.service_status === 'converted').length;
         const conversionRate = total > 0 ? ((convertedCount / total) * 100).toFixed(1) : '0.0';
@@ -63,93 +63,81 @@ export default function InteligenciaLeadsView() {
         return { recovered, potential, boiling, conversionRate };
     }, [rawLeads, totalRecoveredInfo]);
 
-    // --- FETCH TOTAL RECOVERED (CAIXA REAL) ---
-    // CORREÇÃO: Busca diretamente dos perfis convertidos para alinhar com a tabela
-    async function fetchTotalRecovered() {
-        if (!user?.id) return;
-
-        // Busca todos os leads convertidos (sem filtro de data - métrica acumulada)
-        const { data, error } = await supabase
-            .from('leads_profiles')
-            .select('potential_value, converted_value')
-            .eq('user_id', user.id)
-            .eq('service_status', 'converted');
-
-        if (error) {
-            console.error('Erro ao buscar total recuperado:', error);
-            return;
-        }
-
-        if (data) {
-            // Soma usando o valor convertido (se existir) ou potencial como fallback
-            const total = data.reduce((acc, lead) => {
-                const value = Number(lead.converted_value || lead.potential_value || 0);
-                return acc + value;
-            }, 0);
-
-            setTotalRecoveredInfo(total);
-        }
-    }
-
-    useEffect(() => {
-        fetchTotalRecovered();
-    }, [user?.id]); // Removido dateRange - Total Recuperado é métrica acumulada
-
-    // --- FETCH REAL DATA ---
+    // --- FETCH DATA (Unified hook to prevent loops) ---
     useEffect(() => {
         let isMounted = true;
 
-        async function fetchLeads() {
-            if (!user?.id) {
-                console.warn('[InteligenciaLeadsView] Aguardando autenticação...');
-                if (isMounted) setLoading(false);
-                return;
-            }
+        async function loadAllData() {
+            if (!user?.id || authLoading) return;
+
+            console.log('🔄 [InteligenciaLeadsView] Carregando dados para o usuário:', user.id);
+            setLoading(true);
 
             try {
-                // 1. Base Query
+                // 2. Fetch Detailed Leads Profiles
+                // Agora inclui direct_sale para não perder leads que convertem organicamente
                 let query = supabase
                     .from('leads_profiles')
                     .select('*')
                     .eq('user_id', user.id)
-                    .in('service_status', ['pending', 'contacted', 'converted']) // Exclui 'direct_sale'
-                    .order('lead_score', { ascending: false });
+                    .in('service_status', ['processed', 'contacted', 'converted'])
+                    .neq('last_event_type', 'waiting_payment')
+                    .order('updated_at', { ascending: false });
 
                 const { data, error } = await query;
 
-                if (error) {
-                    console.error('[InteligenciaLeadsView] Error fetching leads:', error);
-                    return;
-                }
+                if (error) throw error;
 
                 if (data && isMounted) {
-                    // 2. Client-side Filters (Data primeiro, pois as métricas dependem do período)
                     const now = new Date();
                     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
                     let filtered = data;
 
+                    // Date Filtering (SINCRO COM DASHBOARD)
                     if (dateRange === 'today') {
-                        filtered = data.filter(l => new Date(l.created_at).getTime() >= today);
+                        filtered = data.filter(l => {
+                            const time = new Date(l.created_at).getTime();
+                            const upTime = new Date(l.updated_at).getTime();
+                            // Para abertos, usamos created_at. Para convertidos, usamos updated_at (data da venda).
+                            if (['converted', 'direct_sale'].includes(l.service_status)) return upTime >= today;
+                            return time >= today;
+                        });
                     } else if (dateRange === 'yesterday') {
                         const yesterday = today - 86400000;
                         filtered = data.filter(l => {
-                            const t = new Date(l.created_at).getTime();
-                            return t >= yesterday && t < today;
+                            const time = new Date(l.created_at).getTime();
+                            const upTime = new Date(l.updated_at).getTime();
+                            const target = ['converted', 'direct_sale'].includes(l.service_status) ? upTime : time;
+                            return target >= yesterday && target < today;
                         });
                     } else if (dateRange === '7days') {
                         const sevenDays = today - 7 * 86400000;
-                        filtered = data.filter(l => new Date(l.created_at).getTime() >= sevenDays);
+                        filtered = data.filter(l => {
+                            const target = ['converted', 'direct_sale'].includes(l.service_status) ? new Date(l.updated_at).getTime() : new Date(l.created_at).getTime();
+                            return target >= sevenDays;
+                        });
                     } else if (dateRange === '30days') {
                         const thirtyDays = today - 30 * 86400000;
-                        filtered = data.filter(l => new Date(l.created_at).getTime() >= thirtyDays);
+                        filtered = data.filter(l => {
+                            const target = ['converted', 'direct_sale'].includes(l.service_status) ? new Date(l.updated_at).getTime() : new Date(l.created_at).getTime();
+                            return target >= thirtyDays;
+                        });
                     }
 
                     setRawLeads(filtered);
 
-                    let display = filtered;
+                    // --- CÁLCULO DE ROI SINCRONIZADO NO PERÍODO ---
+                    const totalConvertedInPeriod = filtered
+                        .filter(l => l.service_status === 'converted')
+                        .reduce((acc, lead) => {
+                            const value = Number(lead.converted_value || lead.potential_value || 0);
+                            return acc + value;
+                        }, 0);
 
-                    // Search Filter
+                    setTotalRecoveredInfo(totalConvertedInPeriod);
+
+                    // Client-side Filters
+                    let display = filtered;
                     if (searchTerm) {
                         const lower = searchTerm.toLowerCase();
                         display = display.filter(l =>
@@ -158,9 +146,8 @@ export default function InteligenciaLeadsView() {
                         );
                     }
 
-                    // TAB FILTER LOGIC
                     if (activeTab === 'open') {
-                        display = display.filter(l => ['pending', 'contacted'].includes(l.service_status));
+                        display = display.filter(l => ['processed', 'contacted'].includes(l.service_status));
                     } else if (activeTab === 'converted') {
                         display = display.filter(l => l.service_status === 'converted');
                     }
@@ -168,24 +155,33 @@ export default function InteligenciaLeadsView() {
                     setLeads(display);
                 }
             } catch (err) {
-                console.error('[InteligenciaLeadsView] Fetch error:', err);
+                console.error('❌ [InteligenciaLeadsView] Erro ao carregar dados:', err);
             } finally {
                 if (isMounted) setLoading(false);
             }
         }
 
-        if (!authLoading) {
-            setLoading(true);
-            fetchLeads();
-            fetchTotalRecovered();
-        } else {
-            // setLoading(true); // Removed redundant setLoading(true)
-        }
+        loadAllData();
+
+        // --- REAL-TIME LISTENER ---
+        const channel = supabase
+            .channel(`leads_changes_${user?.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'leads_profiles',
+                filter: `user_id=eq.${user?.id}`
+            }, () => {
+                console.log('⚡ [Real-time] Mudança detectada nos leads! Recarregando...');
+                loadAllData();
+            })
+            .subscribe();
 
         return () => {
             isMounted = false;
+            supabase.removeChannel(channel);
         };
-    }, [user?.id, authLoading, activeTab, dateRange, searchTerm]);
+    }, [user?.id, authLoading, dateRange, activeTab, searchTerm]);
 
     // --- FETCH TIMELINE (REAL) ---
     useEffect(() => {
@@ -273,13 +269,13 @@ export default function InteligenciaLeadsView() {
 
                 if (eventError) console.error("Erro ao registrar evento manual:", eventError);
 
-                // Refetch ROI metrics
-                fetchTotalRecovered();
+                // Update metrics locally to reflect the new conversion without a full refetch loop
+                setTotalRecoveredInfo(prev => prev + finalValue);
             }
         } catch (error) {
-            console.error("Erro ao atualizar status:", error);
-            // Re-fetch para garantir integridade em caso de erro
-            window.location.reload();
+            console.error("❌ [InteligenciaLeadsView] Erro ao atualizar status:", error);
+            // Em caso de erro, o ideal seria reverter o optimistic update, 
+            // mas por agora vamos apenas evitar o reload infinito.
         }
     };
 
@@ -302,21 +298,62 @@ export default function InteligenciaLeadsView() {
                 })
             });
 
-            const data = await response.json();
+            // SEGURANÇA: Verificar se a resposta está OK antes de parsear
+            if (!response.ok) {
+                console.error('❌ [Frontend] Erro HTTP:', response.status, response.statusText);
+                throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+            }
+
+            // SEGURANÇA: Verificar se há conteúdo antes de parsear JSON
+            const responseText = await response.text();
+            if (!responseText || responseText.trim() === '') {
+                console.error('❌ [Frontend] Resposta vazia da API');
+                throw new Error('Resposta vazia da API');
+            }
+
+            // Parse do JSON com tratamento de erro
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('❌ [Frontend] Erro ao parsear JSON:', parseError);
+                console.error('📄 [Frontend] Resposta recebida:', responseText.substring(0, 200));
+                throw new Error('Resposta inválida da API');
+            }
 
             if (data.message) {
+                // --- ATUALIZAÇÃO REATIVA DO DOSSIÊ NO FRONTEND ---
+                const updatedDossie = data.dossie || selectedLead?.lead_summary;
+                const newStatus = (selectedLead?.service_status === 'pending' || selectedLead?.service_status === 'processed')
+                    ? 'contacted'
+                    : selectedLead?.service_status;
+
+                const updatedLead = {
+                    ...selectedLead!,
+                    lead_summary: updatedDossie,
+                    service_status: newStatus
+                };
+
+                // Atualizar estados locais para refletir na UI sem recarregar
+                setSelectedLead(updatedLead);
+                setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
+                setRawLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
+
+                // Abrir WhatsApp
                 const phoneClean = lead.phone?.replace(/\D/g, '') || '';
                 const url = `https://wa.me/55${phoneClean}?text=${encodeURIComponent(data.message)}`;
                 window.open(url, '_blank');
 
-                if ((lead.service_status || 'pending') === 'pending') {
+                // Atualizar status no servidor (se necessário)
+                if (['pending', 'processed'].includes(lead.service_status || 'pending')) {
                     updateServiceStatus(lead.id, 'contacted');
                 }
             } else {
-                alert("Erro na IA: " + data.error);
+                alert("Erro na IA: " + (data.error || 'Resposta inválida'));
             }
-        } catch (error) {
-            alert("Erro de conexão.");
+        } catch (error: any) {
+            console.error('❌ [Frontend] Erro completo:', error);
+            alert("Erro ao gerar mensagem: " + (error.message || 'Erro desconhecido'));
         } finally {
             setLoadingIA(null);
         }
@@ -554,11 +591,19 @@ export default function InteligenciaLeadsView() {
                                                 </div>
 
                                                 {/* Service Status Selector or Badge */}
-                                                {lead.service_status === 'converted' ? (
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30">
-                                                        <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
-                                                        <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-wide">
-                                                            Convertido
+                                                {['converted', 'direct_sale'].includes(lead.service_status) ? (
+                                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded border ${lead.service_status === 'converted'
+                                                        ? 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-200 dark:border-emerald-500/30'
+                                                        : 'bg-blue-100 dark:bg-blue-500/20 border-blue-200 dark:border-blue-500/30'
+                                                        }`}>
+                                                        {lead.service_status === 'converted' ? (
+                                                            <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
+                                                        ) : (
+                                                            <Activity size={12} className="text-blue-600 dark:text-blue-400" />
+                                                        )}
+                                                        <span className={`text-[10px] font-black uppercase tracking-wide ${lead.service_status === 'converted' ? 'text-emerald-700 dark:text-emerald-400' : 'text-blue-700 dark:text-blue-400'
+                                                            }`}>
+                                                            {lead.service_status === 'converted' ? 'Recuperado' : 'Venda Direta'}
                                                         </span>
                                                     </div>
                                                 ) : (

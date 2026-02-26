@@ -10,7 +10,15 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
     try {
-        const { fileId, userId } = await req.json();
+        let body;
+        try {
+            body = await req.json();
+        } catch (parseError: any) {
+            console.error('[API Extraction] ❌ Erro ao parsear JSON:', parseError.message);
+            return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+        }
+
+        const { fileId, userId } = body;
 
         if (!fileId || !userId) {
             return NextResponse.json({ error: 'fileId e userId são obrigatórios' }, { status: 400 });

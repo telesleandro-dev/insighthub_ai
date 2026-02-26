@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Debug/temp files
+database_inspection.json
+full_inspect.txt
+output_check.txt
+webhook_inspection.txt
+webhook_debug.log

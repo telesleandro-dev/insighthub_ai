@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Copy, Check, Globe, ShieldCheck,
   MessageCircle, FileUp, Save, Loader2, Brain, CheckCircle,
-  Info, Activity, LayoutDashboard, Database, Bell, Mail, Zap,
+  Info, Activity, LayoutDashboard, Database, Bell, Zap,
   FileText, Trash2, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
@@ -22,13 +22,15 @@ export default function ConfiguracoesView() {
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
-  const [showToken, setShowToken] = useState(false); // Toggle visibilidade do token
+  const [showToken, setShowToken] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   // Knowledge Files
   const [knowledgeFiles, setKnowledgeFiles] = useState<any[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
+
+
 
   // Email Intelligence config - COMENTADO (aguardando hospedagem de domínio)
   // const [emailConfig, setEmailConfig] = useState<{
@@ -58,19 +60,26 @@ export default function ConfiguracoesView() {
       }
 
       setLoadingSettings(true);
-      // Buscar ai_tone de user_configs (onde a IA também busca)
-      const { data: configData } = await supabase
+      // Buscar configurações de user_configs (ATENÇÃO: api_key não existe nesta tabela)
+      const { data: configData, error: configError } = await supabase
         .from('user_configs')
         .select('ai_tone, telegram_enabled, telegram_token, telegram_chat_id')
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (configError) {
+        console.error('❌ [loadSettings] Erro ao carregar config:', configError.message);
+      }
+
       if (isMounted) {
         if (configData) {
+          console.log('✅ [loadSettings] ai_tone carregado:', configData.ai_tone);
           setAiTone(configData.ai_tone || 'consultivo');
           setTelegramEnabled(configData.telegram_enabled ?? true);
           setTelegramToken(configData.telegram_token || '');
           setTelegramChatId(configData.telegram_chat_id || '');
+        } else {
+          console.warn('⚠️ [loadSettings] Nenhuma config encontrada. Usando defaults.');
         }
         setLoadingSettings(false);
 
@@ -139,31 +148,31 @@ export default function ConfiguracoesView() {
     if (!user) return;
     setLoading(true);
     try {
-      // Usar UPDATE direto ao invés de UPSERT (workaround para erro 400)
-      const { data, error } = await supabase
-        .from('user_configs')
-        .update({
-          ai_tone: aiTone,
-          telegram_enabled: telegramEnabled,
-          telegram_token: telegramToken,
-          telegram_chat_id: telegramChatId
+      // Usar a rota de API com SERVICE_ROLE (bypass RLS + UPSERT garante criação se não existir)
+      const response = await fetch('/api/settings/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          aiTone,
+          telegramEnabled,
+          telegramToken,
+          telegramChatId,
+          apiKeys: []
         })
-        .eq('user_id', user.id);
+      });
 
-      if (error) {
-        console.error('❌ [SaveConfig] Erro ao atualizar:', error);
-        console.error('   Message:', error.message);
-        console.error('   Details:', error.details);
-        alert(`Erro: ${error.message}`);
-        return;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(data.error || `Erro HTTP ${response.status}`);
       }
 
-      console.log('✅ [SaveConfig] Salvo com sucesso!');
+      console.log('✅ [SaveConfig] Salvo via API com sucesso!');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 [SaveConfig] Exception:', error);
-      alert("Falha ao salvar configurações.");
+      alert(`Falha ao salvar: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -174,6 +183,8 @@ export default function ConfiguracoesView() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -191,9 +202,25 @@ export default function ConfiguracoesView() {
         body: formData
       });
 
-      const uploadResult = await uploadResponse.json();
-      if (!uploadResponse.ok) throw new Error(uploadResult.error);
+      // PADRÃO SEGURO: Verificar response.ok
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: `Erro HTTP ${uploadResponse.status}` };
+        }
+        throw new Error(errorData.error || 'Erro no upload');
+      }
 
+      // PADRÃO SEGURO: Verificar resposta vazia
+      const responseText = await uploadResponse.text();
+      if (!responseText || responseText.trim() === '') {
+        throw new Error('Resposta vazia no upload');
+      }
+
+      const uploadResult = JSON.parse(responseText);
       const insertedFile = uploadResult.file;
 
       alert('✅ Arquivo enviado! Processando texto...');
@@ -533,19 +560,35 @@ export default function ConfiguracoesView() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Chat ID */}
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Chat ID</label>
                     <input
                       type="text"
                       value={telegramChatId}
                       onChange={(e) => setTelegramChatId(e.target.value)}
-                      placeholder="Ex: 123456789"
+                      placeholder="Ex: 5826340449"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-all font-mono text-slate-700"
                     />
                   </div>
-                  <p className="text-[9px] text-slate-400">
-                    Crie um bot no <a href="https://t.me/BotFather" target="_blank" className="text-blue-500 hover:underline">BotFather</a> e pegue o token e seu chat ID.
-                  </p>
+
+                  {/* Instruções */}
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-blue-800">📲 Como configurar em 2 passos:</p>
+                    <ol className="text-[9px] text-blue-700 space-y-1.5 ml-3 list-decimal">
+                      <li>
+                        <strong>Bot Token:</strong> Abra o Telegram → pesquise{' '}
+                        <a href="https://t.me/BotFather" target="_blank" className="underline font-bold">@BotFather</a>
+                        {' '}→ envie <code className="bg-blue-100 px-1 rounded">/newbot</code> → copie o token gerado.
+                      </li>
+                      <li>
+                        <strong>Chat ID:</strong> Pesquise{' '}
+                        <a href="https://t.me/userinfobot" target="_blank" className="underline font-bold">@userinfobot</a>
+                        {' '}no Telegram → envie qualquer mensagem → copie o número <code className="bg-blue-100 px-1 rounded">Id</code> que ele responder.
+                      </li>
+                    </ol>
+                  </div>
                 </div>
               )}
 
@@ -553,6 +596,7 @@ export default function ConfiguracoesView() {
                 Receba notificações de novas vendas, abandonos de carrinho e insights estratégicos de leads diretamente no seu celular.
               </p>
             </section>
+
 
           </div>
 

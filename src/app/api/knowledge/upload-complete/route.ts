@@ -27,7 +27,27 @@ export async function POST(req: Request) {
 
         // 1. Upload para Storage (com SERVICE_ROLE - bypass RLS)
         const timestamp = Date.now();
-        const filePath = `knowledge/${userId}/${timestamp}_${file.name}`;
+
+        // Sanitizar nome do arquivo para evitar chave inválida no Supabase Storage
+        const sanitizeFileName = (name: string): string => {
+            // 1. Remover extensões temporárias do Chrome/Firefox (ex: .crdownload, .partial, .tmp)
+            let clean = name.replace(/\.(crdownload|partial|download|tmp)$/i, '');
+            // 2. Separar nome e extensão final
+            const lastDot = clean.lastIndexOf('.');
+            const ext = lastDot !== -1 ? clean.substring(lastDot) : '';
+            const base = lastDot !== -1 ? clean.substring(0, lastDot) : clean;
+            // 3. Substituir caracteres especiais no BASE (mantém apenas letras, números, - _ espaço)
+            const safeBase = base
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+                .replace(/[^\w\s-]/g, '_')  // Substitui caracteres especiais por _
+                .replace(/\s+/g, '_')        // Substitui espaços por _
+                .replace(/__+/g, '_')         // Colapsa múltiplos _ em um
+                .replace(/^_|_$/g, '');       // Remove _ do início e fim
+            return safeBase + ext.toLowerCase();
+        };
+
+        const safeFileName = sanitizeFileName(file.name);
+        const filePath = `knowledge/${userId}/${timestamp}_${safeFileName}`;
 
         const { error: storageError } = await supabaseAdmin.storage
             .from('knowledge-base')
