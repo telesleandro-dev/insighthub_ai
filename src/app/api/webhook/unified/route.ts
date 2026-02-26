@@ -203,15 +203,16 @@ export async function POST(req: Request) {
         console.log('[Webhook] User ID:', userId);
 
         // 📌 VALIDAÇÃO DE API KEY (Segurança para N8n e Integrações Externas)
-        const apiKey = req.headers.get('x-api-key');
+        // Aceita via header OU via query parameter (para compatibilidade com n8n)
+        const apiKey = req.headers.get('x-api-key') || searchParams.get('api_key');
         const systemSecret = process.env.WEBHOOK_SECRET;
 
         if (!apiKey) {
-            console.error('[Webhook] ❌ API Key ausente. Header x-api-key é obrigatório.');
+            console.error('[Webhook] ❌ API Key ausente. Use header x-api-key ou query param api_key.');
             return NextResponse.json(
                 {
                     error: 'Missing API Key',
-                    message: 'Include x-api-key header for authentication',
+                    message: 'Include x-api-key header or api_key query parameter for authentication',
                     documentation: 'https://github.com/telesleandro-dev/insighthub_ai#webhook-authentication'
                 },
                 { status: 401 }
