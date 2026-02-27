@@ -313,41 +313,30 @@ export async function POST(req: Request) {
         });
 
         // 5. BUSCAR CONFIGURAÇÃO DO USUÁRIO
-        // Bypass Auth for Testing (Temporary Debug)
         let userAuthData: any = null;
-        let bypass = false;
 
-        if (userId === 'bypass_auth_999') {
-            console.log('[Webhook] Bypass Auth Activated');
-            bypass = true;
-            userAuthData = { user: { id: 'dfe126ac-0bb0-46d9-9d4a-938a22044a4f', email: 'test_setup@insighthub.ai' } };
-        } else if (isMasterKey) {
-            console.log('[Webhook] 🛠️ Master Key bypass: Usando ID da URL diretamente');
+        if (isMasterKey) {
+            console.log('[Webhook] 🛠️ Master Key: Usando ID da URL diretamente');
             userAuthData = { user: { id: userId, email: 'system-master@insighthub.ai' } };
         } else {
-            console.log('[Webhook] [DEBUG] Searching for user ID:', userId);
+            console.log('[Webhook] Buscando usuário:', userId);
             const { data, error: authErr } = await supabase.auth.admin.getUserById(userId);
-            if (authErr) console.error('[Webhook] [DEBUG] Auth Admin Error:', authErr.message);
+            if (authErr) console.error('[Webhook] Auth Error:', authErr.message);
             userAuthData = data;
         }
 
         if (!userAuthData || !userAuthData.user) {
             console.error('[Webhook] Usuário não localizado no Auth', userId);
             return NextResponse.json({
-                error: 'Usuário não localizado (Debug)',
-                receivedId: userId,
-                debug: { isMasterKey },
-                details: 'ID invalido ou não encontrado no Auth.'
+                error: 'Usuário não localizado',
+                details: 'ID inválido ou não encontrado.'
             }, { status: 400 });
         }
-
-        // If bypass, use the hardcoded ID for logic
-        const effectiveUserId = bypass ? userAuthData.user.id : userId;
 
         const { data: dbUserConfig, error: configError } = await supabase
             .from('user_configs')
             .select('user_id, telegram_token, telegram_chat_id')
-            .eq('user_id', effectiveUserId)
+            .eq('user_id', userId)
             .maybeSingle();
 
         if (configError) {
@@ -361,9 +350,9 @@ export async function POST(req: Request) {
         let userConfig = dbUserConfig;
 
         if (!userConfig && isMasterKey) {
-            console.log('[Webhook] 🛠️ Master Key fallback: Criando configuração temporária em memória');
+            console.log('[Webhook] 🛠️ Master Key fallback: Criando configuração em memória');
             userConfig = {
-                user_id: effectiveUserId,
+                user_id: userId,
                 telegram_token: null,
                 telegram_chat_id: null
             };
@@ -373,12 +362,7 @@ export async function POST(req: Request) {
             console.warn('[Webhook] Usuário não encontrado:', userId);
             return NextResponse.json({
                 error: 'Usuário não localizado',
-                debug: {
-                    isMasterKey,
-                    apiKeySize: apiKey?.trim().length,
-                    systemSecretSize: systemSecret?.trim().length,
-                    match: apiKey?.trim() === (systemSecret || '').trim()
-                }
+                message: 'Nenhuma configuração encontrada para este user_id.'
             }, { status: 401 });
         }
 
