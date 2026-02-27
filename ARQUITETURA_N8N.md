@@ -42,10 +42,13 @@ Quando o n8n envia dados, o `insighthub.adapter` processa o payload normalizado 
 #### `POST /api/webhook/unified?user_id={USER_ID}`
 **Função:** Porta de entrada de todos os eventos de venda.
 
-**Autenticação:**
+**Autenticação (duas opções):**
 ```http
+# Opção 1: Header
 x-api-key: {WEBHOOK_SECRET ou api_key do usuário}
-```
+
+# Opção 2: Query Parameter (recomendado para n8n)
+?api_key={WEBHOOK_SECRET}
 
 **Payload do n8n → InsightHub:**
 ```json
@@ -78,9 +81,13 @@ x-api-key: {WEBHOOK_SECRET ou api_key do usuário}
 #### `POST /api/leads/update-profile`
 **Função:** O n8n envia o dossiê da IA e promove o lead para `processed` (visível no frontend).
 
-**Autenticação:**
+**Autenticação (duas opções):**
 ```http
+# Header
 x-api-key: {WEBHOOK_SECRET}
+
+# Ou Query Parameter
+?api_key={WEBHOOK_SECRET}
 ```
 
 **Payload:**
@@ -177,7 +184,7 @@ x-api-key: {WEBHOOK_SECRET}
 | Notificação Telegram por venda | ✅ Pronto | Configurável por usuário |
 | Multi-tenant (isolamento de dados) | ✅ Pronto | RLS no Supabase |
 | **Workflow n8n criado** | ✅ Pronto | Workflow configurado e funcional |
-| **n8n hospedado publicamente** | ⚠️ Pendente | Railway, Render ou VPS |
+| **n8n hospedado publicamente** | ✅ Pronto | Hospedado no Render |
 
 ---
 
@@ -217,5 +224,5 @@ TELEGRAM_CHAT_ID=...
 
 ---
 
-**Última atualização:** 19/02/2026  
+**Última atualização:** 27/02/2026  
 **Responsável:** Leandro Teles / InsightHub AI

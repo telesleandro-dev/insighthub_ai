@@ -1,7 +1,0 @@
-[ERROR] User Not Found: 90d0d014-e2ea-499f-9fb1-d17b662fa43f | HasServiceKey: true
-[ERROR] User Not Found: 90d0d014-e2ea-499f-9fb1-d17b662fa43f | HasServiceKey: true
-[2026-02-09T18:34:10.140Z] Email: bruno@recupera.com | ServiceStatus: contacted | ROI Valid: true
-[2026-02-09T18:34:57.726Z] Email: ana@organica.com | ServiceStatus: pending | ROI Valid: false
-[2026-02-09T18:36:19.140Z] Email: edu@cartao.com | ServiceStatus: contacted | ROI Valid: true
-[2026-02-09T19:49:38.605Z] Email: lead_roi@teste.com | ServiceStatus: contacted | ROI Valid: true
-[2026-02-09T19:49:48.282Z] Email: lead_organico@teste.com | ServiceStatus: pending | ROI Valid: false

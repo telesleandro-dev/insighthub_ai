@@ -41,8 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 # Debug/temp files
+*.log
+*_BACKUP*
 database_inspection.json
 full_inspect.txt
 output_check.txt
 webhook_inspection.txt
-webhook_debug.log
